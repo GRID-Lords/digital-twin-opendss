@@ -1,0 +1,15 @@
+# OpenDSS Interface and Simulation
+opendssdirect.py>=0.9.1
+
+# Visualization and Network Analysis  
+networkx>=3.0
+matplotlib>=3.7.0
+pandas>=2.0.0
+
+# Additional utilities
+numpy>=1.21.0
+seaborn>=0.12.0
+
+# Optional: For enhanced plotting
+plotly>=5.0.0
+bokeh>=3.0.0
