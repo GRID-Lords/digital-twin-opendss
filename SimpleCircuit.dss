@@ -1,0 +1,39 @@
+! Simple OpenDSS Circuit for Testing
+Clear
+
+! Create circuit with source bus
+New Circuit.TestCircuit phases=3 BasekV=12.47
+~ bus1=SourceBus
+
+! Add transformer
+New Transformer.XFMR phases=3 windings=2
+~ Buses=(SourceBus.1.2.3.0 SubBus.1.2.3.0)
+~ Conns=(Delta Wye)
+~ KVs=(12.47 0.48)
+~ KVAs=(1000 1000)
+~ XHL=5
+~ %R=0.5
+
+! Add loads
+New Load.Load1 phases=3
+~ Bus1=SubBus.1.2.3.0
+~ kV=0.48
+~ kW=100 kvar=50
+~ Model=1
+
+! Add line
+New Line.Line1 phases=3
+~ Bus1=SubBus.1.2.3.0 Bus2=LoadBus.1.2.3.0
+~ R1=0.1 X1=0.2 R0=0.3 X0=0.6
+~ Length=1.0 Units=mi
+
+! Add another load
+New Load.Load2 phases=3
+~ Bus1=LoadBus.1.2.3.0
+~ kV=0.48
+~ kW=200 kvar=100
+~ Model=1
+
+! Solve
+CalcVoltageBases
+Solve

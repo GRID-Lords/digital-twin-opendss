@@ -1,0 +1,30 @@
+OPENDSS CIRCUIT ANALYSIS REPORT
+==================================================
+
+CIRCUIT SUMMARY
+--------------------
+Total Buses: 3
+Total Elements: 5
+Buses: sourcebus, subbus, loadbus
+
+VOLTAGE ANALYSIS
+--------------------
+sourcebus: 0.9999 pu
+subbus: 0.9899 pu
+loadbus: 0.8265 pu
+
+ELEMENT SUMMARY
+--------------------
+Vsource: 1
+Transformer: 1
+Load: 2
+Line: 1
+
+FILES GENERATED
+--------------------
+✓ circuit_diagram.png
+✓ electrical_schematic.png
+✓ power_analysis.png
+✓ voltage_analysis.png
+✓ power_data.csv
+✓ voltage_data.csv
