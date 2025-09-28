@@ -64,21 +64,22 @@ def test_digital_twin_components():
     try:
         # Test OpenDSS circuit
         logger.info("Testing OpenDSS circuit...")
-        from circuit_visualizer import OpenDSSVisualizer
-        visualizer = OpenDSSVisualizer("IndianEHVSubstation.dss")
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from visualization.circuit_visualizer import OpenDSSVisualizer
+        visualizer = OpenDSSVisualizer("src/models/IndianEHVSubstation.dss")
         visualizer.load_and_solve()
         logger.info("✓ OpenDSS circuit test passed")
         
         # Test AI/ML models
         logger.info("Testing AI/ML models...")
-        from ai_ml_models import SubstationAIManager
+        from models.ai_ml_models import SubstationAIManager
         ai_manager = SubstationAIManager()
         ai_manager.initialize_with_synthetic_data()
         logger.info("✓ AI/ML models test passed")
         
         # Test SCADA integration
         logger.info("Testing SCADA integration...")
-        from scada_integration import SCADAIntegrationManager
+        from integration.scada_integration import SCADAIntegrationManager
         scada_config = {'collection_interval': 1.0}
         scada_manager = SCADAIntegrationManager(scada_config)
         scada_manager.start_integration()
@@ -99,7 +100,8 @@ def start_digital_twin_server():
     
     try:
         # Import and start the server
-        from digital_twin_server import app, digital_twin
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from api.digital_twin_server import app, digital_twin
         import uvicorn
         
         # Start the server in a separate process
