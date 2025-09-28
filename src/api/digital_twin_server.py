@@ -23,9 +23,9 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 from pydantic import BaseModel
 import opendssdirect as dss
-from circuit_visualizer import OpenDSSVisualizer
-from ai_ml_models import SubstationAIManager
-from scada_integration import SCADAIntegrationManager
+from visualization.circuit_visualizer import OpenDSSVisualizer
+from models.ai_ml_models import SubstationAIManager
+from integration.scada_integration import SCADAIntegrationManager
 import matplotlib
 matplotlib.use('Agg', force=True)
 
@@ -91,7 +91,7 @@ class AssetControlRequest(BaseModel):
 class IndianEHVSubstationDigitalTwin:
     """Digital Twin for Indian EHV 400/220 kV Substation"""
     
-    def __init__(self, dss_file: str = "IndianEHVSubstation.dss"):
+    def __init__(self, dss_file: str = "src/models/IndianEHVSubstation.dss"):
         self.dss_file = Path(dss_file)
         self.visualizer = OpenDSSVisualizer(str(self.dss_file))
         self.is_running = False
