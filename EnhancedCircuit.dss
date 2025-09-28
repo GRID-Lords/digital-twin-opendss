@@ -1,0 +1,82 @@
+! Enhanced OpenDSS Circuit for Professional Visualization
+Clear
+
+! Create circuit with source bus
+New Circuit.EnhancedSubstation phases=3 BasekV=12.47
+~ bus1=SourceBus
+
+! Add main transformer
+New Transformer.MainXFMR phases=3 windings=2
+~ Buses=(SourceBus.1.2.3.0 SubBus.1.2.3.0)
+~ Conns=(Delta Wye)
+~ KVs=(12.47 0.48)
+~ KVAs=(5000 5000)
+~ XHL=6
+~ %R=0.5
+
+! Add distribution transformer
+New Transformer.DistXFMR phases=3 windings=2
+~ Buses=(SubBus.1.2.3.0 MidBus.1.2.3.0)
+~ Conns=(Wye Wye)
+~ KVs=(0.48 0.24)
+~ KVAs=(2000 2000)
+~ XHL=4
+~ %R=0.3
+
+! Add distribution lines
+New Line.MainFeeder phases=3
+~ Bus1=MidBus.1.2.3.0 Bus2=LoadBus1.1.2.3.0
+~ R1=0.05 X1=0.1 R0=0.15 X0=0.3
+~ Length=0.5 Units=mi
+
+New Line.Branch1 phases=3
+~ Bus1=MidBus.1.2.3.0 Bus2=LoadBus2.1.2.3.0
+~ R1=0.08 X1=0.12 R0=0.2 X0=0.4
+~ Length=0.3 Units=mi
+
+New Line.Branch2 phases=3
+~ Bus1=MidBus.1.2.3.0 Bus2=LoadBus3.1.2.3.0
+~ R1=0.06 X1=0.15 R0=0.18 X0=0.45
+~ Length=0.4 Units=mi
+
+! Add loads with different characteristics
+New Load.ResidentialLoad phases=3
+~ Bus1=LoadBus1.1.2.3.0
+~ kV=0.24
+~ kW=500 kvar=200
+~ Model=1
+
+New Load.CommercialLoad phases=3
+~ Bus1=LoadBus2.1.2.3.0
+~ kV=0.24
+~ kW=800 kvar=300
+~ Model=1
+
+New Load.IndustrialLoad phases=3
+~ Bus1=LoadBus3.1.2.3.0
+~ kV=0.24
+~ kW=1200 kvar=600
+~ Model=1
+
+! Add capacitor bank for power factor correction
+New Capacitor.CapBank1 phases=3
+~ Bus1=LoadBus2.1.2.3.0
+~ kV=0.24
+~ kvar=400
+~ States=(1)
+
+! Add voltage regulator
+New Transformer.VReg phases=1 windings=2
+~ Buses=(MidBus.1.0 MidBus.1.0)
+~ Conns=(wye wye)
+~ kvs=(0.24 0.24)
+~ kvas=(1000 1000)
+~ XHL=2
+~ %LoadLoss=0.1
+~ MaxTap=1.05
+~ MinTap=0.95
+~ NumTaps=11
+
+! Solve the circuit
+CalcVoltageBases
+Solve

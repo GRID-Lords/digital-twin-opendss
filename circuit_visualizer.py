@@ -203,16 +203,15 @@ class OpenDSSVisualizer:
             }
                 
     def create_network_diagram(self, save=True, show=True):
-        """Create a professional network diagram"""
+        """Create a professional network diagram with electrical symbols"""
         # Create networkx graph
         G = nx.Graph()
         
-        # Add nodes (buses)
+        # Add nodes (buses) with voltage data
         for bus in self.circuit_data['buses']:
             try:
                 voltage_data = self.circuit_data['voltages'][bus]
                 if len(voltage_data) >= 2:
-                    # Get magnitude from first value (magnitude, angle pairs)
                     voltage_mag = voltage_data[0]
                 else:
                     voltage_mag = 1.0
@@ -220,156 +219,127 @@ class OpenDSSVisualizer:
                 voltage_mag = 1.0
             G.add_node(bus, voltage=voltage_mag)
         
-        # Add edges (lines, transformers)
-        edge_types = {}
+        # Add edges with power data
+        edge_data = {}
         for element, info in self.circuit_data['element_info'].items():
             if len(info['buses']) >= 2 and info['enabled']:
                 bus1 = info['buses'][0].split('.')[0]
                 bus2 = info['buses'][1].split('.')[0]
                 
                 if bus1 in G.nodes and bus2 in G.nodes:
-                    G.add_edge(bus1, bus2, element=element)
-                    
-                    # Classify element type
-                    if 'Line.' in element:
-                        edge_types[(bus1, bus2)] = 'line'
-                    elif 'Transformer.' in element:
-                        edge_types[(bus1, bus2)] = 'transformer'
+                    # Calculate power magnitude
+                    power_data = info['power']
+                    if len(power_data) >= 2:
+                        power_mag = (power_data[0]**2 + power_data[1]**2)**0.5
                     else:
-                        edge_types[(bus1, bus2)] = 'other'
+                        power_mag = 0.0
+                    
+                    G.add_edge(bus1, bus2, element=element, power=power_mag)
+                    edge_data[(bus1, bus2)] = {
+                        'element': element,
+                        'power': power_mag,
+                        'type': 'line' if 'Line.' in element else 'transformer' if 'Transformer.' in element else 'other'
+                    }
         
-        # Create the plot
-        fig, ax = plt.subplots(1, 1, figsize=(14, 10))
+        # Create the plot with better layout
+        fig, ax = plt.subplots(1, 1, figsize=(16, 12))
         
-        # Use spring layout for automatic positioning
-        pos = nx.spring_layout(G, k=3, iterations=50)
+        # Use hierarchical layout for better substation appearance
+        pos = self._create_hierarchical_layout(G)
         
-        # Draw different types of edges with different styles
-        for edge, edge_type in edge_types.items():
+        # Draw edges with power annotations
+        for edge, data in edge_data.items():
+            edge_type = data['type']
+            power = data['power']
+            
             if edge_type == 'line':
-                nx.draw_networkx_edges(G, pos, edgelist=[edge], 
-                                     edge_color='blue', width=2, alpha=0.7, ax=ax)
+                color = 'blue'
+                width = max(2, min(8, power/1000))  # Width based on power
+                style = '-'
             elif edge_type == 'transformer':
-                nx.draw_networkx_edges(G, pos, edgelist=[edge], 
-                                     edge_color='red', width=4, alpha=0.8, ax=ax)
+                color = 'red'
+                width = 6
+                style = '-'
             else:
-                nx.draw_networkx_edges(G, pos, edgelist=[edge], 
-                                     edge_color='gray', width=1, alpha=0.5, ax=ax)
+                color = 'gray'
+                width = 2
+                style = '--'
+            
+            # Draw the edge
+            nx.draw_networkx_edges(G, pos, edgelist=[edge], 
+                                edge_color=color, width=width, 
+                                alpha=0.8, style=style, ax=ax)
+            
+            # Add power annotation
+            if power > 0:
+                mid_x = (pos[edge[0]][0] + pos[edge[1]][0]) / 2
+                mid_y = (pos[edge[0]][1] + pos[edge[1]][1]) / 2
+                ax.text(mid_x, mid_y, f'{power:.0f} kW', 
+                       ha='center', va='center', fontsize=8,
+                       bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
         
-        # Draw nodes with voltage-based coloring
-        voltages = [G.nodes[node]['voltage'] for node in G.nodes()]
-        nodes = nx.draw_networkx_nodes(G, pos, node_color=voltages, 
-                                     cmap='RdYlGn', node_size=1500, 
-                                     alpha=0.9, ax=ax)
+        # Draw nodes with enhanced styling
+        for node in G.nodes():
+            voltage = G.nodes[node]['voltage']
+            
+            # Determine node style based on voltage level
+            if voltage > 0.98:
+                color = 'green'
+                size = 2000
+                symbol = 'o'
+            elif voltage > 0.95:
+                color = 'orange'
+                size = 1500
+                symbol = 's'
+            else:
+                color = 'red'
+                size = 1000
+                symbol = '^'
+            
+            # Draw node
+            ax.scatter(pos[node][0], pos[node][1], c=color, s=size, 
+                      marker=symbol, alpha=0.8, edgecolors='black', linewidth=2)
+            
+            # Add voltage annotation
+            ax.text(pos[node][0], pos[node][1] + 0.3, f'{voltage:.3f} pu', 
+                   ha='center', va='bottom', fontsize=9, fontweight='bold',
+                   bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.9))
         
-        # Add colorbar for voltage
-        cbar = plt.colorbar(nodes, ax=ax)
-        cbar.set_label('Voltage (p.u.)', fontsize=12)
-        
-        # Draw labels
-        nx.draw_networkx_labels(G, pos, font_size=10, font_weight='bold', ax=ax)
+        # Draw bus labels
+        for node in G.nodes():
+            ax.text(pos[node][0], pos[node][1] - 0.4, node, 
+                   ha='center', va='top', fontsize=10, fontweight='bold')
         
         # Add title and formatting
-        ax.set_title('Substation Circuit Diagram\nVoltage Profile and System Topology', 
-                    fontsize=16, fontweight='bold', pad=20)
+        ax.set_title('Professional Substation Network Diagram\nPower Flow and Voltage Profile', 
+                    fontsize=18, fontweight='bold', pad=20)
         
-        # Add legend
+        # Enhanced legend
         legend_elements = [
-            plt.Line2D([0], [0], color='blue', lw=2, label='Distribution Lines'),
-            plt.Line2D([0], [0], color='red', lw=4, label='Transformers'),
+            plt.Line2D([0], [0], color='blue', lw=4, label='Distribution Lines'),
+            plt.Line2D([0], [0], color='red', lw=6, label='Transformers'),
             plt.Line2D([0], [0], marker='o', color='green', lw=0, 
-                      markersize=10, label='High Voltage Bus'),
-            plt.Line2D([0], [0], marker='o', color='yellow', lw=0, 
-                      markersize=10, label='Medium Voltage Bus'),
-            plt.Line2D([0], [0], marker='o', color='red', lw=0, 
-                      markersize=10, label='Low Voltage Bus')
+                      markersize=12, label='High Voltage Bus (>0.98 pu)'),
+            plt.Line2D([0], [0], marker='s', color='orange', lw=0, 
+                      markersize=12, label='Medium Voltage Bus (0.95-0.98 pu)'),
+            plt.Line2D([0], [0], marker='^', color='red', lw=0, 
+                      markersize=12, label='Low Voltage Bus (<0.95 pu)')
         ]
-        ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.98, 0.98))
+        ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.98, 0.98),
+                 fontsize=10, framealpha=0.9)
         
+        # Add grid and formatting
+        ax.grid(True, alpha=0.3)
         ax.set_aspect('equal')
+        ax.set_xlim(-1, 11)
+        ax.set_ylim(-1, 7)
+        
         plt.tight_layout()
         
         if save:
             output_path = self.results_dir / 'circuit_diagram.png'
             plt.savefig(str(output_path), dpi=300, bbox_inches='tight')
-            print(f"✓ Network diagram saved to {output_path}")
-        
-        if show:
-            plt.show()
-        else:
-            plt.close()
-            
-        return fig
-        
-    def create_detailed_schematic(self, save=True, show=True):
-        """Create a detailed electrical schematic"""
-        fig, ax = plt.subplots(1, 1, figsize=(16, 10))
-        
-        # Define positions manually for a proper schematic
-        positions = {
-            'SourceBus': (1, 5),
-            'SubBus': (4, 5),
-            'MidBus': (7, 5),
-            'LoadBus1': (10, 6),
-            'LoadBus2': (10, 5),
-            'LoadBus3': (10, 4)
-        }
-        
-        # Filter positions to only include existing buses
-        existing_positions = {bus: pos for bus, pos in positions.items() 
-                            if bus in self.circuit_data['buses']}
-        
-        # Draw transmission line (source)
-        self._draw_transmission_line(ax, (0, 5), (1, 5))
-        
-        # Draw transformer
-        if 'SubBus' in existing_positions:
-            self._draw_transformer(ax, existing_positions['SourceBus'], 
-                                 existing_positions['SubBus'])
-        
-        # Draw distribution lines
-        for element, info in self.circuit_data['element_info'].items():
-            if 'Line.' in element and info['enabled']:
-                buses = [b.split('.')[0] for b in info['buses'][:2]]
-                if all(bus in existing_positions for bus in buses):
-                    pos1 = existing_positions[buses[0]]
-                    pos2 = existing_positions[buses[1]]
-                    self._draw_distribution_line(ax, pos1, pos2)
-        
-        # Draw buses
-        for bus, pos in existing_positions.items():
-            voltage = self.circuit_data['voltages'].get(bus, [1.0])[0]
-            self._draw_bus(ax, pos, bus, voltage)
-        
-        # Draw loads
-        load_buses = ['LoadBus1', 'LoadBus2', 'LoadBus3']
-        load_types = ['Residential', 'Commercial', 'Industrial']
-        
-        for i, (bus, load_type) in enumerate(zip(load_buses, load_types)):
-            if bus in existing_positions:
-                pos = existing_positions[bus]
-                self._draw_load(ax, (pos[0], pos[1]-0.5), load_type)
-        
-        # Set axis properties
-        ax.set_xlim(-0.5, 11)
-        ax.set_ylim(2.5, 7.5)
-        ax.set_aspect('equal')
-        ax.grid(True, alpha=0.3)
-        ax.set_title('Electrical Single Line Diagram\nSubstation and Distribution System', 
-                    fontsize=16, fontweight='bold', pad=20)
-        
-        # Add voltage level annotations
-        ax.text(0.5, 6.5, '115 kV\nTransmission', ha='center', va='center', 
-               fontsize=10, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue"))
-        ax.text(6, 6.5, '12.47 kV\nDistribution', ha='center', va='center',
-               fontsize=10, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgreen"))
-        
-        plt.tight_layout()
-        
-        if save:
-            output_path = self.results_dir / 'electrical_schematic.png'
-            plt.savefig(str(output_path), dpi=300, bbox_inches='tight')
-            print(f"✓ Electrical schematic saved to {output_path}")
+            print(f"✓ Enhanced network diagram saved to {output_path}")
         
         if show:
             plt.show()
@@ -378,19 +348,266 @@ class OpenDSSVisualizer:
             
         return fig
     
-    def _draw_transmission_line(self, ax, start, end):
-        """Draw transmission line symbol"""
+    def _create_hierarchical_layout(self, G):
+        """Create a hierarchical layout for substation diagrams"""
+        pos = {}
+        
+        # Define positions for different bus types
+        bus_positions = {
+            'SourceBus': (1, 5),
+            'SubBus': (4, 5),
+            'MidBus': (7, 5),
+            'LoadBus1': (10, 6),
+            'LoadBus2': (10, 5),
+            'LoadBus3': (10, 4)
+        }
+        
+        # Use predefined positions if available, otherwise use spring layout
+        for node in G.nodes():
+            if node in bus_positions:
+                pos[node] = bus_positions[node]
+            else:
+                # Fallback to spring layout for unknown nodes
+                if not pos:
+                    pos = nx.spring_layout(G, k=3, iterations=50)
+                break
+        
+        return pos
+        
+    def create_detailed_schematic(self, save=True, show=True):
+        """Create a detailed electrical schematic with professional symbols"""
+        fig, ax = plt.subplots(1, 1, figsize=(18, 12))
+        
+        # Define positions for a realistic substation layout
+        positions = {
+            'SourceBus': (2, 6),
+            'SubBus': (6, 6),
+            'MidBus': (10, 6),
+            'LoadBus1': (14, 7),
+            'LoadBus2': (14, 6),
+            'LoadBus3': (14, 5)
+        }
+        
+        # Filter positions to only include existing buses
+        existing_positions = {bus: pos for bus, pos in positions.items() 
+                            if bus in self.circuit_data['buses']}
+        
+        # Draw transmission system (left side)
+        self._draw_transmission_system(ax, (0, 6), (2, 6))
+        
+        # Draw main transformer with power annotation
+        if 'SubBus' in existing_positions and 'SourceBus' in existing_positions:
+            self._draw_main_transformer(ax, existing_positions['SourceBus'], 
+                                      existing_positions['SubBus'])
+        
+        # Draw distribution system
+        if 'MidBus' in existing_positions and 'SubBus' in existing_positions:
+            self._draw_distribution_system(ax, existing_positions['SubBus'], 
+                                        existing_positions['MidBus'])
+        
+        # Draw load feeders with power annotations
+        for element, info in self.circuit_data['element_info'].items():
+            if 'Line.' in element and info['enabled']:
+                buses = [b.split('.')[0] for b in info['buses'][:2]]
+                if all(bus in existing_positions for bus in buses):
+                    pos1 = existing_positions[buses[0]]
+                    pos2 = existing_positions[buses[1]]
+                    power = (info['power'][0]**2 + info['power'][1]**2)**0.5 if len(info['power']) >= 2 else 0
+                    self._draw_feeder_line(ax, pos1, pos2, element, power)
+        
+        # Draw buses with voltage annotations
+        for bus, pos in existing_positions.items():
+            voltage = self.circuit_data['voltages'].get(bus, [1.0])[0]
+            self._draw_enhanced_bus(ax, pos, bus, voltage)
+        
+        # Draw loads with power consumption
+        load_buses = ['LoadBus1', 'LoadBus2', 'LoadBus3']
+        load_types = ['Residential\n(3 MW)', 'Commercial\n(2.5 MW)', 'Industrial\n(4 MW)']
+        load_colors = ['lightblue', 'lightgreen', 'lightcoral']
+        
+        for i, (bus, load_type, color) in enumerate(zip(load_buses, load_types, load_colors)):
+            if bus in existing_positions:
+                pos = existing_positions[bus]
+                self._draw_enhanced_load(ax, (pos[0], pos[1]-1), load_type, color)
+        
+        # Add protective devices
+        self._draw_protective_devices(ax, existing_positions)
+        
+        # Set axis properties
+        ax.set_xlim(-1, 16)
+        ax.set_ylim(3, 9)
+        ax.set_aspect('equal')
+        ax.grid(True, alpha=0.2)
+        ax.set_title('Professional Substation Single Line Diagram\nPower System with Protective Devices', 
+                    fontsize=18, fontweight='bold', pad=20)
+        
+        # Add voltage level annotations with better styling
+        ax.text(1, 8.5, 'TRANSMISSION\n115 kV', ha='center', va='center', 
+               fontsize=12, fontweight='bold',
+               bbox=dict(boxstyle="round,pad=0.5", facecolor="lightblue", alpha=0.8))
+        ax.text(8, 8.5, 'DISTRIBUTION\n12.47 kV', ha='center', va='center',
+               fontsize=12, fontweight='bold',
+               bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgreen", alpha=0.8))
+        ax.text(14, 8.5, 'LOAD CENTERS\n0.48 kV', ha='center', va='center',
+               fontsize=12, fontweight='bold',
+               bbox=dict(boxstyle="round,pad=0.5", facecolor="lightcoral", alpha=0.8))
+        
+        # Add legend
+        legend_elements = [
+            plt.Line2D([0], [0], color='red', lw=6, label='Main Transformer'),
+            plt.Line2D([0], [0], color='blue', lw=3, label='Distribution Lines'),
+            plt.Line2D([0], [0], color='green', lw=2, label='Protective Devices'),
+            plt.Line2D([0], [0], marker='o', color='black', lw=0, 
+                      markersize=8, label='Bus'),
+            plt.Line2D([0], [0], marker='^', color='purple', lw=0, 
+                      markersize=8, label='Load')
+        ]
+        ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0.02, 0.98),
+                 fontsize=10, framealpha=0.9)
+        
+        plt.tight_layout()
+        
+        if save:
+            output_path = self.results_dir / 'electrical_schematic.png'
+            plt.savefig(str(output_path), dpi=300, bbox_inches='tight')
+            print(f"✓ Enhanced electrical schematic saved to {output_path}")
+        
+        if show:
+            plt.show()
+        else:
+            plt.close()
+            
+        return fig
+    
+    def _draw_transmission_system(self, ax, start, end):
+        """Draw transmission system with three-phase lines"""
+        # Main transmission line
         line = plt.Line2D([start[0], end[0]], [start[1], end[1]], 
-                         color='black', linewidth=3)
+                         color='black', linewidth=4)
         ax.add_line(line)
         
-        # Add transmission line symbol (three parallel lines)
+        # Three-phase representation
         for i in range(-1, 2):
-            offset = 0.1 * i
+            offset = 0.15 * i
             line = plt.Line2D([start[0], end[0]], 
                             [start[1] + offset, end[1] + offset], 
-                            color='black', linewidth=1)
+                            color='black', linewidth=2)
             ax.add_line(line)
+        
+        # Add transmission voltage annotation
+        mid_x = (start[0] + end[0]) / 2
+        ax.text(mid_x, start[1] + 0.3, '115 kV', ha='center', va='bottom', 
+               fontsize=10, fontweight='bold',
+               bbox=dict(boxstyle="round,pad=0.2", facecolor="lightblue", alpha=0.8))
+    
+    def _draw_main_transformer(self, ax, start, end):
+        """Draw main transformer with power rating"""
+        # Connection lines
+        mid_x = (start[0] + end[0]) / 2
+        
+        line1 = plt.Line2D([start[0], mid_x - 0.4], [start[1], start[1]], 
+                          color='black', linewidth=3)
+        line2 = plt.Line2D([mid_x + 0.4, end[0]], [end[1], end[1]], 
+                          color='black', linewidth=3)
+        ax.add_line(line1)
+        ax.add_line(line2)
+        
+        # Transformer symbol (two circles)
+        circle1 = Circle((mid_x - 0.2, start[1]), 0.2, 
+                        fill=False, edgecolor='red', linewidth=3)
+        circle2 = Circle((mid_x + 0.2, end[1]), 0.2, 
+                        fill=False, edgecolor='red', linewidth=3)
+        ax.add_patch(circle1)
+        ax.add_patch(circle2)
+        
+        # Power rating annotation
+        ax.text(mid_x, start[1] + 0.5, '25 MVA\n115/12.47 kV', 
+               ha='center', va='center', fontsize=10, fontweight='bold',
+               bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9))
+    
+    def _draw_distribution_system(self, ax, start, end):
+        """Draw distribution system"""
+        line = plt.Line2D([start[0], end[0]], [start[1], end[1]], 
+                         color='blue', linewidth=3)
+        ax.add_line(line)
+        
+        # Add distribution voltage annotation
+        mid_x = (start[0] + end[0]) / 2
+        ax.text(mid_x, start[1] + 0.3, '12.47 kV', ha='center', va='bottom', 
+               fontsize=9, fontweight='bold',
+               bbox=dict(boxstyle="round,pad=0.2", facecolor="lightgreen", alpha=0.8))
+    
+    def _draw_feeder_line(self, ax, start, end, element_name, power):
+        """Draw feeder line with power annotation"""
+        line = plt.Line2D([start[0], end[0]], [start[1], end[1]], 
+                         color='blue', linewidth=2, alpha=0.8)
+        ax.add_line(line)
+        
+        # Add power annotation
+        if power > 0:
+            mid_x = (start[0] + end[0]) / 2
+            mid_y = (start[1] + end[1]) / 2
+            ax.text(mid_x, mid_y, f'{power:.0f} kW', 
+                   ha='center', va='center', fontsize=8,
+                   bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+    
+    def _draw_enhanced_bus(self, ax, pos, name, voltage):
+        """Draw enhanced bus with voltage annotation"""
+        # Bus symbol (thick line)
+        bus_line = plt.Line2D([pos[0]-0.2, pos[0]+0.2], [pos[1], pos[1]], 
+                             color='black', linewidth=8, alpha=0.8)
+        ax.add_line(bus_line)
+        
+        # Voltage annotation
+        ax.text(pos[0], pos[1] + 0.4, f'{voltage:.3f} pu', 
+               ha='center', va='bottom', fontsize=9, fontweight='bold',
+               bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.9))
+        
+        # Bus name
+        ax.text(pos[0], pos[1] - 0.4, name, 
+               ha='center', va='top', fontsize=10, fontweight='bold')
+    
+    def _draw_enhanced_load(self, ax, pos, load_type, color):
+        """Draw enhanced load with power consumption"""
+        # Load symbol (arrow pointing down)
+        arrow = patches.FancyArrowPatch((pos[0], pos[1]), (pos[0], pos[1] - 0.4),
+                                      connectionstyle="arc3", 
+                                      arrowstyle='->', 
+                                      mutation_scale=25, 
+                                      color='purple', 
+                                      linewidth=3)
+        ax.add_patch(arrow)
+        
+        # Load label with background
+        ax.text(pos[0] + 0.5, pos[1] - 0.2, load_type, 
+               ha='left', va='center', fontsize=9, fontweight='bold',
+               bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.8))
+    
+    def _draw_protective_devices(self, ax, positions):
+        """Draw protective devices (circuit breakers, fuses)"""
+        # Circuit breakers at key locations
+        breaker_positions = [
+            (4, 6.3),  # Between source and transformer
+            (8, 6.3),  # Between transformer and distribution
+            (12, 6.3), # Between distribution and loads
+        ]
+        
+        for pos in breaker_positions:
+            # Circuit breaker symbol (rectangle with X)
+            rect = Rectangle((pos[0]-0.15, pos[1]-0.1), 0.3, 0.2, 
+                           fill=False, edgecolor='green', linewidth=2)
+            ax.add_patch(rect)
+            
+            # X symbol inside
+            ax.plot([pos[0]-0.1, pos[0]+0.1], [pos[1]-0.05, pos[1]+0.05], 
+                   color='green', linewidth=2)
+            ax.plot([pos[0]-0.1, pos[0]+0.1], [pos[1]+0.05, pos[1]-0.05], 
+                   color='green', linewidth=2)
+            
+            # Label
+            ax.text(pos[0], pos[1] - 0.3, 'CB', ha='center', va='top', 
+                   fontsize=8, fontweight='bold',
+                   bbox=dict(boxstyle="round,pad=0.1", facecolor="lightgreen", alpha=0.8))
     
     def _draw_transformer(self, ax, start, end):
         """Draw transformer symbol"""
@@ -763,7 +980,7 @@ class OpenDSSVisualizer:
 def main():
     """Main function to run the visualizer"""
     # Initialize the visualizer
-    dss_file = "SimpleCircuit.dss"  # Use the working simple circuit
+    dss_file = "EnhancedCircuit.dss"  # Use the enhanced circuit for better visualization
     
     if not Path(dss_file).exists():
         print(f"Error: DSS file '{dss_file}' not found!")
