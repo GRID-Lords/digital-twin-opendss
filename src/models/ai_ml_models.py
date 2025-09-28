@@ -348,22 +348,37 @@ class SubstationAIManager:
     def initialize_with_synthetic_data(self):
         """Initialize AI models with synthetic data for demonstration"""
         try:
+            logger.info("🧠 Training AI/ML models with synthetic data...")
+            
             # Generate synthetic historical data
             np.random.seed(42)
-            n_samples = 1000
+            n_samples = 2000  # Increased for better training
             
             synthetic_data = []
             asset_types = ['PowerTransformer', 'DistributionTransformer', 'CircuitBreaker', 'IndustrialLoad']
             
             for asset_type in asset_types:
                 for i in range(n_samples // len(asset_types)):
-                    # Generate realistic data
-                    voltage = np.random.normal(400 if 'Power' in asset_type else 220, 20)
-                    current = np.random.normal(100, 20)
+                    # Generate realistic data with correlations
+                    base_voltage = 400 if 'Power' in asset_type else 220 if 'Distribution' in asset_type else 12.47
+                    voltage = base_voltage + np.random.normal(0, base_voltage * 0.05)
+                    
+                    base_current = 200 if 'Power' in asset_type else 150 if 'Distribution' in asset_type else 100
+                    current = base_current + np.random.normal(0, base_current * 0.1)
+                    
                     power = voltage * current * np.random.uniform(0.8, 1.0)
-                    temperature = np.random.normal(45, 10)
+                    
+                    # Temperature correlated with power and age
+                    base_temp = 45 if 'Power' in asset_type else 50 if 'Distribution' in asset_type else 35
+                    power_factor = min(1.0, power / 100000.0)  # Normalize power
+                    temperature = base_temp + power_factor * 20 + np.random.normal(0, 5)
+                    
                     age_days = np.random.uniform(0, 3650)  # 0-10 years
-                    health_score = max(0, min(100, 100 - (age_days / 3650) * 30 + np.random.normal(0, 5)))
+                    
+                    # Health score decreases with age and temperature
+                    age_factor = (age_days / 3650) * 20  # Up to 20% reduction
+                    temp_factor = max(0, (temperature - 60) / 20) * 10  # Temperature penalty
+                    health_score = max(0, min(100, 100 - age_factor - temp_factor + np.random.normal(0, 3)))
                     
                     synthetic_data.append({
                         'asset_id': f'{asset_type}_{i}',
@@ -379,16 +394,115 @@ class SubstationAIManager:
             
             # Convert to DataFrame
             df = pd.DataFrame(synthetic_data)
+            logger.info(f"Generated {len(df)} synthetic data points")
             
             # Train models
+            logger.info("Training anomaly detection model...")
             self.anomaly_detector.train(df)
+            
+            logger.info("Training predictive maintenance model...")
             self.predictive_model.train(df)
             
             self.is_initialized = True
-            logger.info("AI/ML models initialized with synthetic data")
+            logger.info("✅ AI/ML models trained successfully")
+            
+            # Log model performance
+            self._log_model_performance()
             
         except Exception as e:
-            logger.error(f"Error initializing AI models: {e}")
+            logger.error(f"❌ Error training AI models: {e}")
+            raise
+    
+    def _log_model_performance(self):
+        """Log model performance metrics"""
+        try:
+            logger.info("📊 AI/ML Model Performance:")
+            
+            # Anomaly detector performance
+            if self.anomaly_detector.is_trained:
+                for asset_type, model in self.anomaly_detector.models.items():
+                    logger.info(f"  • Anomaly Detector ({asset_type}): Trained with {len(model.estimators_)} trees")
+            
+            # Predictive model performance
+            if self.predictive_model.is_trained:
+                for asset_type, model in self.predictive_model.models.items():
+                    feature_importance = self.predictive_model.feature_importance.get(asset_type, {})
+                    logger.info(f"  • Predictive Model ({asset_type}): Trained with {len(model.estimators_)} trees")
+                    if feature_importance:
+                        top_feature = max(feature_importance.items(), key=lambda x: x[1])
+                        logger.info(f"    - Most important feature: {top_feature[0]} ({top_feature[1]:.3f})")
+            
+            logger.info("🎯 Models ready for real-time analysis")
+            
+        except Exception as e:
+            logger.warning(f"Could not log model performance: {e}")
+    
+    def train_with_historical_data(self, historical_data_path: str):
+        """Train models with real historical data"""
+        try:
+            logger.info(f"📚 Loading historical data from {historical_data_path}")
+            
+            # Load historical data
+            if historical_data_path.endswith('.csv'):
+                df = pd.read_csv(historical_data_path)
+            elif historical_data_path.endswith('.json'):
+                df = pd.read_json(historical_data_path)
+            else:
+                raise ValueError("Unsupported file format. Use CSV or JSON.")
+            
+            logger.info(f"Loaded {len(df)} historical records")
+            
+            # Validate required columns
+            required_columns = ['asset_type', 'voltage', 'current', 'power', 'temperature', 'health_score']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                raise ValueError(f"Missing required columns: {missing_columns}")
+            
+            # Train models
+            logger.info("Training anomaly detection model...")
+            self.anomaly_detector.train(df)
+            
+            logger.info("Training predictive maintenance model...")
+            self.predictive_model.train(df)
+            
+            self.is_initialized = True
+            logger.info("✅ AI/ML models trained with historical data")
+            
+            # Log model performance
+            self._log_model_performance()
+            
+        except Exception as e:
+            logger.error(f"❌ Error training with historical data: {e}")
+            raise
+    
+    def retrain_models(self, new_data: pd.DataFrame):
+        """Retrain models with new data (online learning)"""
+        try:
+            logger.info("🔄 Retraining AI/ML models with new data...")
+            
+            # Combine with existing data if available
+            if hasattr(self, '_training_data'):
+                combined_data = pd.concat([self._training_data, new_data], ignore_index=True)
+            else:
+                combined_data = new_data
+            
+            # Keep only recent data (last 2 years)
+            if 'timestamp' in combined_data.columns:
+                combined_data['timestamp'] = pd.to_datetime(combined_data['timestamp'])
+                cutoff_date = datetime.now() - timedelta(days=730)
+                combined_data = combined_data[combined_data['timestamp'] >= cutoff_date]
+            
+            # Retrain models
+            self.anomaly_detector.train(combined_data)
+            self.predictive_model.train(combined_data)
+            
+            # Store for future retraining
+            self._training_data = combined_data
+            
+            logger.info("✅ Models retrained successfully")
+            
+        except Exception as e:
+            logger.error(f"❌ Error retraining models: {e}")
             raise
     
     def analyze_current_state(self, assets: Dict[str, Dict], metrics: Dict) -> Dict:
