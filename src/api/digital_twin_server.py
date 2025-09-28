@@ -20,6 +20,7 @@ from websockets.server import WebSocketServerProtocol
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 from pydantic import BaseModel
 import opendssdirect as dss
@@ -471,6 +472,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for frontend
+try:
+    app.mount("/static", StaticFiles(directory="../../frontend/build/static"), name="static")
+except:
+    pass  # Frontend not built yet
 
 # Initialize Digital Twin
 digital_twin = IndianEHVSubstationDigitalTwin()
