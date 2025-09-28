@@ -3,22 +3,26 @@ OPENDSS CIRCUIT ANALYSIS REPORT
 
 CIRCUIT SUMMARY
 --------------------
-Total Buses: 3
-Total Elements: 5
-Buses: sourcebus, subbus, loadbus
+Total Buses: 6
+Total Elements: 11
+Buses: sourcebus, subbus, midbus, loadbus1, loadbus2, loadbus3
 
 VOLTAGE ANALYSIS
 --------------------
-sourcebus: 0.9999 pu
-subbus: 0.9899 pu
-loadbus: 0.8265 pu
+sourcebus: 0.9994 pu
+subbus: 0.9873 pu
+midbus: 1.1162 pu
+loadbus1: 0.7649 pu
+loadbus2: 0.7863 pu
+loadbus3: 0.4753 pu
 
 ELEMENT SUMMARY
 --------------------
 Vsource: 1
-Transformer: 1
-Load: 2
-Line: 1
+Transformer: 3
+Line: 3
+Load: 3
+Capacitor: 1
 
 FILES GENERATED
 --------------------
