@@ -405,8 +405,8 @@ async def get_system_events(
             "type": event_category,
             "severity": "high" if event_category == "fault" else "medium" if event_category in ["alarm", "warning"] else "low",
             "description": np.random.choice(descriptions),
-            "acknowledged": np.random.choice([True, False], p=[0.8, 0.2]),
-            "duration": np.random.randint(1, 120) if event_category in ["fault", "alarm"] else None
+            "acknowledged": bool(np.random.choice([True, False], p=[0.8, 0.2])),
+            "duration": int(np.random.randint(1, 120)) if event_category in ["fault", "alarm"] else None
         })
 
     # Sort events by timestamp

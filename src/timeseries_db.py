@@ -44,11 +44,12 @@ class TimeSeriesDB:
                     metric_name TEXT NOT NULL,
                     value REAL NOT NULL,
                     metadata TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_timestamp (timestamp),
-                    INDEX idx_asset_metric (asset_id, metric_name, timestamp)
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON metrics_raw(timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_asset_metric ON metrics_raw(asset_id, metric_name, timestamp)")
 
             # Hourly aggregated data
             cursor.execute("""
@@ -97,12 +98,13 @@ class TimeSeriesDB:
                     acknowledged BOOLEAN DEFAULT FALSE,
                     acknowledged_at DATETIME,
                     acknowledged_by TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_event_timestamp (timestamp),
-                    INDEX idx_event_type (event_type),
-                    INDEX idx_event_asset (asset_id)
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_timestamp ON system_events(timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_type ON system_events(event_type)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_asset ON system_events(asset_id)")
 
             # Asset health history
             cursor.execute("""
@@ -116,10 +118,11 @@ class TimeSeriesDB:
                     efficiency REAL,
                     status TEXT,
                     alarms TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_health_timestamp (asset_id, timestamp)
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_health_timestamp ON asset_health_history(asset_id, timestamp)")
 
             # Power flow history
             cursor.execute("""
@@ -133,10 +136,11 @@ class TimeSeriesDB:
                     frequency REAL,
                     voltage_400kv REAL,
                     voltage_220kv REAL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_power_timestamp (timestamp)
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_power_timestamp ON power_flow_history(timestamp)")
 
             conn.commit()
             logger.info("Time-series database initialized")

@@ -777,7 +777,7 @@ const SubstationVisualization3D = () => {
         <div>Frequency: {metrics.frequency?.toFixed(2) || 50.00} Hz</div>
         <div>Voltage Stability: {metrics.voltage_stability?.toFixed(1) || 0}%</div>
         <div>System Efficiency: {metrics.efficiency?.toFixed(1) || 0}%</div>
-        <div>Active Components: {Object.keys(assets).length}</div>
+        <div>Active Components: {assets.total_assets || 0}</div>
       </InfoPanel>
 
       <Canvas camera={{ position: [25, 20, 25], fov: 60 }}>
