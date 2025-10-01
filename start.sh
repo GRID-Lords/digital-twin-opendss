@@ -101,14 +101,24 @@ start_local() {
         httpx python-multipart aiofiles py-dss-interface pymodbus python-dotenv redis 2>/dev/null || true
     echo -e "${GREEN}✓ Dependencies installed${NC}"
 
-    # Step 3: Clean up existing processes
-    echo -e "${BLUE}[3/5] Preparing system...${NC}"
+    # Step 3: Train AI models if needed
+    echo -e "${BLUE}[3/6] Checking AI/ML models...${NC}"
+    if [ ! -d "models" ] || [ ! -f "models/anomaly_detector.pkl" ]; then
+        echo -e "${YELLOW}Training AI/ML models (first-time setup, ~30 seconds)...${NC}"
+        python train_ai_models.py > logs/training.log 2>&1
+        echo -e "${GREEN}✓ AI models trained${NC}"
+    else
+        echo -e "${GREEN}✓ Pre-trained models found${NC}"
+    fi
+
+    # Step 4: Clean up existing processes
+    echo -e "${BLUE}[4/6] Preparing system...${NC}"
     check_port 8000
     check_port 3000
     echo -e "${GREEN}✓ System ready${NC}"
 
-    # Step 4: Start backend
-    echo -e "${BLUE}[4/5] Starting backend server...${NC}"
+    # Step 5: Start backend
+    echo -e "${BLUE}[5/6] Starting backend server...${NC}"
     python src/backend_server.py > logs/backend.log 2>&1 &
     BACKEND_PID=$!
     echo -e "${GREEN}✓ Backend started (PID: $BACKEND_PID)${NC}"
@@ -124,9 +134,9 @@ start_local() {
         exit 1
     fi
 
-    # Step 5: Start frontend (if exists)
+    # Step 6: Start frontend (if exists)
     if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-        echo -e "${BLUE}[5/5] Starting frontend...${NC}"
+        echo -e "${BLUE}[6/6] Starting frontend...${NC}"
         cd frontend
         if [ ! -d "node_modules" ]; then
             npm install --silent
