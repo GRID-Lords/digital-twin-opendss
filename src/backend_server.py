@@ -920,6 +920,38 @@ async def get_ai_analysis():
         logger.error(f"AI analysis error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/iot/devices")
+async def get_iot_devices():
+    """Get IoT devices and sensors"""
+    try:
+        # Generate IoT device data from assets
+        devices = []
+        if asset_manager:
+            for asset_id, asset in asset_manager.assets.items():
+                devices.append({
+                    "id": asset_id,
+                    "name": asset.name,
+                    "type": asset.asset_type.value,
+                    "status": "online" if asset.status.value == "operational" else "offline",
+                    "location": asset.location,
+                    "last_update": datetime.now().isoformat(),
+                    "metrics": {
+                        "temperature": asset.thermal.temperature_celsius,
+                        "health_score": asset.health.overall_health,
+                        "voltage": asset.electrical.voltage_rating_kv
+                    }
+                })
+
+        return {
+            "devices": devices,
+            "total_count": len(devices),
+            "online_count": len([d for d in devices if d["status"] == "online"]),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"IoT devices error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/control")
 async def send_control_command(command: ControlCommand):
     """Send control command to asset"""
