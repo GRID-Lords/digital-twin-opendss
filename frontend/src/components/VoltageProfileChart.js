@@ -3,25 +3,29 @@ import styled from 'styled-components';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const ChartContainer = styled.div`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   padding: 1.5rem;
-  color: white;
+  color: #f1f5f9;
 `;
 
 const ChartTitle = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: white;
+  color: #f1f5f9;
 `;
 
 const VoltageProfileChart = ({ assets }) => {
-  // Extract voltage data from assets
-  const voltageData = Object.entries(assets)
-    .filter(([_, asset]) => asset.voltage > 0)
+  // Extract voltage data from assets - handle arrays and objects
+  const assetsObj = Array.isArray(assets)
+    ? assets.reduce((acc, asset) => ({ ...acc, [asset.id || asset.name]: asset }), {})
+    : (assets || {});
+
+  const voltageData = Object.entries(assetsObj)
+    .filter(([_, asset]) => asset && asset.voltage > 0)
     .map(([assetId, asset]) => ({
       name: assetId,
       voltage: asset.voltage,
@@ -63,19 +67,19 @@ const VoltageProfileChart = ({ assets }) => {
       <ChartTitle>Voltage Profile Across Assets</ChartTitle>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={voltageData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
-          <XAxis 
-            dataKey="name" 
-            stroke="rgba(255, 255, 255, 0.7)"
+          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <XAxis
+            dataKey="name"
+            stroke="#94a3b8"
             fontSize={12}
             angle={-45}
             textAnchor="end"
             height={60}
           />
-          <YAxis 
-            stroke="rgba(255, 255, 255, 0.7)"
+          <YAxis
+            stroke="#94a3b8"
             fontSize={12}
-            label={{ value: 'Voltage (kV)', angle: -90, position: 'insideLeft' }}
+            label={{ value: 'Voltage (kV)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8' } }}
           />
           <Tooltip content={<CustomTooltip />} />
           <Bar 

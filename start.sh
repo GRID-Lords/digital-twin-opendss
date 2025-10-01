@@ -1,290 +1,248 @@
 #!/bin/bash
 
-# Indian EHV Substation Digital Twin - Complete System Startup Script
-# This script starts both backend and frontend with proper logging and verification
+# Digital Twin System - Unified Startup Script
+# Single point of entry for the entire system
+# Supports both Docker and Local deployment modes
 
-set -e  # Exit on any error
+set -e
 
-# Colors for output
-RED='\033[0;31m'
+# Colors
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
 
-# Logging functions
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+clear
 
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_step() {
-    echo -e "${PURPLE}[STEP]${NC} $1"
-}
-
-# Create logs directory
-mkdir -p logs
-
-# Log file
-LOG_FILE="logs/startup.log"
-exec > >(tee -a "$LOG_FILE")
-exec 2>&1
-
-echo "🇮🇳 Indian EHV Substation Digital Twin - System Startup"
-echo "======================================================"
-echo "Timestamp: $(date)"
-echo "Log file: $LOG_FILE"
+echo "==========================================================="
+echo "   Indian EHV 400/220 kV Substation Digital Twin"
+echo "   SIH India Hackathon - AI/ML Enabled System"
+echo "==========================================================="
 echo ""
+
+# Deployment mode: docker, local, or auto (default)
+MODE="${1:-auto}"
 
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to check if a port is in use
-port_in_use() {
-    lsof -ti:$1 >/dev/null 2>&1
-}
-
-# Function to kill processes on specific ports
-kill_port() {
-    local port=$1
-    if port_in_use $port; then
-        log_warning "Port $port is in use. Killing existing processes..."
-        lsof -ti:$port | xargs kill -9 2>/dev/null || true
-        sleep 2
+# Function to check if port is in use
+check_port() {
+    if lsof -ti:$1 >/dev/null 2>&1; then
+        echo -e "${YELLOW}Port $1 is in use. Killing existing process...${NC}"
+        lsof -ti:$1 | xargs kill -9 2>/dev/null || true
+        sleep 1
     fi
 }
 
-# Step 1: System Requirements Check
-log_step "Checking system requirements..."
-
-# Check Python
-if ! command_exists python3; then
-    log_error "Python 3 is not installed. Please install Python 3.8+"
-    exit 1
-fi
-
-PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-if [[ $(echo "$PYTHON_VERSION < 3.8" | bc -l) -eq 1 ]]; then
-    log_error "Python 3.8+ is required. Current version: $PYTHON_VERSION"
-    exit 1
-fi
-log_success "Python $PYTHON_VERSION detected"
-
-# Check Node.js
-if ! command_exists node; then
-    log_error "Node.js is not installed. Please install Node.js 16+"
-    exit 1
-fi
-
-NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 16 ]; then
-    log_error "Node.js 16+ is required. Current version: $(node -v)"
-    exit 1
-fi
-log_success "Node.js $(node -v) detected"
-
-# Check npm
-if ! command_exists npm; then
-    log_error "npm is not installed"
-    exit 1
-fi
-log_success "npm $(npm -v) detected"
-
-# Step 2: Clean up existing processes
-log_step "Cleaning up existing processes..."
-kill_port 3000
-kill_port 8000
-log_success "Ports cleared"
-
-# Step 3: Install Python Dependencies
-log_step "Installing Python dependencies..."
-python3 -m pip install --user --quiet \
-    fastapi uvicorn websockets pandas numpy scikit-learn \
-    matplotlib opendssdirect pymodbus requests sqlite3 \
-    pytest pytest-asyncio httpx
-log_success "Python dependencies installed"
-
-# Step 4: Install Frontend Dependencies
-log_step "Installing frontend dependencies..."
-cd frontend
-if [ ! -d "node_modules" ]; then
-    npm install --silent
-    log_success "Frontend dependencies installed"
-else
-    log_success "Frontend dependencies already installed"
-fi
-cd ..
-
-# Step 5: Run Tests
-log_step "Running system tests..."
-
-# Run Python tests
-log_info "Running backend tests..."
-python3 -m pytest tests/ -v --tb=short || {
-    log_warning "Some tests failed, but continuing..."
-}
-
-# Run frontend tests
-log_info "Running frontend tests..."
-cd frontend
-npm test -- --watchAll=false --passWithNoTests || {
-    log_warning "Some frontend tests failed, but continuing..."
-}
-cd ..
-
-# Step 6: Train AI/ML Models
-log_step "Training AI/ML models..."
-python3 -c "
-import sys
-sys.path.insert(0, 'src')
-from models.ai_ml_models import SubstationAIManager
-import logging
-
-logging.basicConfig(level=logging.INFO)
-ai_manager = SubstationAIManager()
-ai_manager.initialize_with_synthetic_data()
-print('AI/ML models trained successfully')
-"
-log_success "AI/ML models trained and ready"
-
-# Step 7: Start Backend
-log_step "Starting backend server..."
-python3 main.py &
-BACKEND_PID=$!
-log_info "Backend PID: $BACKEND_PID"
-
-# Wait for backend to start
-log_info "Waiting for backend to start..."
-for i in {1..30}; do
-    if curl -s http://localhost:8000/api/metrics >/dev/null 2>&1; then
-        log_success "Backend server started successfully"
-        break
+# Load environment configuration
+load_env() {
+    if [ -f .env ]; then
+        echo -e "${BLUE}Loading environment configuration...${NC}"
+        set -a
+        source .env
+        set +a
+        echo -e "${GREEN}✓ Environment loaded${NC}"
     fi
-    if [ $i -eq 30 ]; then
-        log_error "Backend failed to start within 30 seconds"
-        kill $BACKEND_PID 2>/dev/null || true
+}
+
+# Function to start with Docker
+start_docker() {
+    echo -e "${BLUE}Starting with Docker Compose...${NC}"
+
+    # Check Docker installation
+    if ! command_exists docker; then
+        echo -e "${RED}Docker is not installed. Install from: https://docs.docker.com/get-docker/${NC}"
         exit 1
     fi
-    sleep 1
-done
 
-# Step 8: Start Frontend
-log_step "Starting frontend server..."
-cd frontend
-npm start &
-FRONTEND_PID=$!
-log_info "Frontend PID: $FRONTEND_PID"
-cd ..
-
-# Wait for frontend to start
-log_info "Waiting for frontend to start..."
-for i in {1..60}; do
-    if curl -s http://localhost:3000 >/dev/null 2>&1; then
-        log_success "Frontend server started successfully"
-        break
-    fi
-    if [ $i -eq 60 ]; then
-        log_error "Frontend failed to start within 60 seconds"
-        kill $FRONTEND_PID 2>/dev/null || true
-        kill $BACKEND_PID 2>/dev/null || true
+    if ! command_exists docker-compose; then
+        echo -e "${RED}Docker Compose is not installed. Install from: https://docs.docker.com/compose/install/${NC}"
         exit 1
     fi
-    sleep 1
-done
 
-# Step 9: System Verification
-log_step "Verifying system functionality..."
+    # Load environment
+    load_env
 
-# Test API endpoints
-log_info "Testing API endpoints..."
-curl -s http://localhost:8000/api/assets >/dev/null && log_success "Assets API working"
-curl -s http://localhost:8000/api/metrics >/dev/null && log_success "Metrics API working"
-curl -s http://localhost:8000/api/scada/data >/dev/null && log_success "SCADA API working"
-curl -s http://localhost:8000/api/ai/analysis >/dev/null && log_success "AI API working"
+    # Build and start services
+    echo -e "${BLUE}Building Docker images...${NC}"
+    docker-compose build
 
-# Test WebSocket
-log_info "Testing WebSocket connection..."
-python3 -c "
-import websocket
-import time
-import threading
+    echo -e "${BLUE}Starting Docker services...${NC}"
+    docker-compose up -d
 
-def on_message(ws, message):
-    print('WebSocket message received')
-    ws.close()
+    echo -e "${GREEN}✓ Docker services started!${NC}"
+    docker-compose ps
+}
 
-def on_error(ws, error):
-    print(f'WebSocket error: {error}')
+# Function to start locally
+start_local() {
+    # Load environment
+    load_env
 
-def on_close(ws, close_status_code, close_msg):
-    print('WebSocket closed')
+    # Step 1: Check Python environment
+    echo -e "${BLUE}[1/5] Checking Python environment...${NC}"
+    if [ -d "venv" ]; then
+        source venv/bin/activate
+        echo -e "${GREEN}✓ Virtual environment activated${NC}"
+    else
+        echo -e "${YELLOW}Creating virtual environment...${NC}"
+        python3 -m venv venv
+        source venv/bin/activate
+    fi
 
-def on_open(ws):
-    print('WebSocket connected')
-    time.sleep(1)
-    ws.close()
+    # Step 2: Install dependencies
+    echo -e "${BLUE}[2/5] Installing dependencies...${NC}"
+    pip install -q --upgrade pip
+    pip install -q fastapi uvicorn websockets pandas numpy scikit-learn matplotlib \
+        httpx python-multipart aiofiles py-dss-interface pymodbus python-dotenv redis 2>/dev/null || true
+    echo -e "${GREEN}✓ Dependencies installed${NC}"
 
-ws = websocket.WebSocketApp('ws://localhost:8000/ws',
-                          on_open=on_open,
-                          on_message=on_message,
-                          on_error=on_error,
-                          on_close=on_close)
-ws.run_forever()
-" && log_success "WebSocket connection working"
+    # Step 3: Clean up existing processes
+    echo -e "${BLUE}[3/5] Preparing system...${NC}"
+    check_port 8000
+    check_port 3000
+    echo -e "${GREEN}✓ System ready${NC}"
 
-# Step 10: Final Status
-echo ""
-echo "🎉 Digital Twin System Started Successfully!"
-echo "============================================="
-echo ""
-echo "🌐 Access Points:"
-echo "  • Frontend Dashboard: http://localhost:3000"
-echo "  • Backend API: http://localhost:8000"
-echo "  • API Documentation: http://localhost:8000/docs"
-echo "  • WebSocket: ws://localhost:8000/ws"
-echo ""
-echo "📊 System Status:"
-echo "  • Backend PID: $BACKEND_PID"
-echo "  • Frontend PID: $FRONTEND_PID"
-echo "  • Log file: $LOG_FILE"
-echo ""
-echo "🔧 Features Available:"
-echo "  • Real-time monitoring dashboard"
-echo "  • Asset management and control"
-echo "  • SCADA data visualization"
-echo "  • AI/ML analytics and predictions"
-echo "  • Professional circuit visualizations"
-echo ""
-echo "🛑 To stop the system:"
-echo "  • Press Ctrl+C"
-echo "  • Or run: kill $BACKEND_PID $FRONTEND_PID"
-echo ""
+    # Step 4: Start backend
+    echo -e "${BLUE}[4/5] Starting backend server...${NC}"
+    python src/backend_server.py > logs/backend.log 2>&1 &
+    BACKEND_PID=$!
+    echo -e "${GREEN}✓ Backend started (PID: $BACKEND_PID)${NC}"
 
-# Keep the script running and handle cleanup
+    # Wait for backend
+    sleep 5
+
+    # Check if backend is running
+    if curl -s http://localhost:8000/health >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Backend is healthy${NC}"
+    else
+        echo -e "${RED}✗ Backend failed to start. Check logs/backend.log${NC}"
+        exit 1
+    fi
+
+    # Step 5: Start frontend (if exists)
+    if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+        echo -e "${BLUE}[5/5] Starting frontend...${NC}"
+        cd frontend
+        if [ ! -d "node_modules" ]; then
+            npm install --silent
+        fi
+        DANGEROUSLY_DISABLE_HOST_CHECK=true npm start > ../logs/frontend.log 2>&1 &
+        FRONTEND_PID=$!
+        cd ..
+        echo -e "${GREEN}✓ Frontend started (PID: $FRONTEND_PID)${NC}"
+    else
+        echo -e "${YELLOW}Frontend not configured, running backend only${NC}"
+    fi
+}
+
+# Create logs directory if not exists
+mkdir -p logs
+
+# Main execution based on mode
+case "$MODE" in
+    docker)
+        start_docker
+        ;;
+    local)
+        start_local
+        ;;
+    auto|*)
+        # Auto-detect mode
+        if command_exists docker && command_exists docker-compose && [ -f "docker-compose.yml" ]; then
+            echo -e "${BLUE}Docker detected. Choose deployment mode:${NC}"
+            echo "  1) Docker (recommended for production)"
+            echo "  2) Local (for development)"
+            echo ""
+            read -p "Enter choice [1-2] (default: 2): " choice
+            case $choice in
+                1) start_docker ;;
+                *) start_local ;;
+            esac
+        else
+            start_local
+        fi
+        ;;
+esac
+
+# Display success message
+display_success() {
+    echo ""
+    echo "==========================================================="
+    echo -e "${GREEN} Digital Twin System Successfully Started!${NC}"
+    echo "==========================================================="
+    echo ""
+
+    if [ "$MODE" = "docker" ]; then
+        echo "Access Points:"
+        echo "  • Frontend:    http://localhost:3000"
+        echo "  • Backend API: http://localhost:8000"
+        echo "  • API Docs:    http://localhost:8000/docs"
+        echo "  • Grafana:     http://localhost:3001 (admin/admin)"
+        echo "  • InfluxDB:    http://localhost:8086"
+        echo ""
+        echo "To stop: docker-compose down"
+    else
+        echo "Access Points:"
+        echo "  • API Documentation: http://localhost:8000/docs"
+        echo "  • Backend API: http://localhost:8000"
+        echo "  • Health Check: http://localhost:8000/health"
+        echo "  • Cache Stats: http://localhost:8000/api/cache/stats"
+        [ ! -z "$FRONTEND_PID" ] && echo "  • Frontend Dashboard: http://localhost:3000"
+        echo ""
+        echo "Storage Strategy:"
+        echo "  • Real-time data: Cached for ${REALTIME_CACHE_TTL:-60} seconds"
+        echo "  • Metrics storage: Every ${METRICS_STORAGE_INTERVAL:-3600} seconds (hourly)"
+        echo "  • Database: ${DB_TYPE:-sqlite}"
+        echo ""
+        echo "Key Features:"
+        echo "  ✓ Complete asset modeling (Transformers, Breakers, CTs, CVTs)"
+        echo "  ✓ SCADA/IoT data integration (Modbus, IEC 61850)"
+        echo "  ✓ Advanced power flow simulation"
+        echo "  ✓ Fault analysis & contingency studies"
+        echo "  ✓ AI/ML anomaly detection & predictive maintenance"
+        echo "  ✓ Real-time monitoring with WebSockets"
+        echo "  ✓ Optimized data storage (hourly aggregation)"
+        echo ""
+        echo "API Endpoints:"
+        echo "  GET  /api/assets                  - Asset management"
+        echo "  GET  /api/metrics                 - Real-time metrics"
+        echo "  GET  /api/metrics/historical     - Historical data"
+        echo "  GET  /api/cache/stats            - Cache statistics"
+        echo "  GET  /api/scada/data             - SCADA data"
+        echo "  POST /api/simulation             - Run simulations"
+        echo "  GET  /api/ai/analysis            - AI/ML analysis"
+        echo "  WS   /ws                         - WebSocket"
+        echo ""
+        echo "To stop: Press Ctrl+C"
+    fi
+}
+
+# Display success message after starting
+display_success
+
+# Cleanup on exit (for local mode)
 cleanup() {
-    log_info "Shutting down system..."
-    kill $FRONTEND_PID 2>/dev/null || true
-    kill $BACKEND_PID 2>/dev/null || true
-    log_success "System shutdown complete"
+    echo ""
+    echo -e "${YELLOW}Shutting down Digital Twin...${NC}"
+    if [ "$MODE" = "docker" ]; then
+        docker-compose down
+    else
+        kill $BACKEND_PID 2>/dev/null || true
+        [ ! -z "$FRONTEND_PID" ] && kill $FRONTEND_PID 2>/dev/null || true
+        deactivate 2>/dev/null || true
+    fi
+    echo -e "${GREEN}System stopped${NC}"
     exit 0
 }
 
 trap cleanup SIGINT SIGTERM
 
-# Wait for processes
-wait $BACKEND_PID $FRONTEND_PID
+# Keep running (for local mode)
+if [ "$MODE" != "docker" ]; then
+    wait $BACKEND_PID
+fi

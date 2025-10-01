@@ -17,7 +17,7 @@ const PageHeader = styled.div`
 `;
 
 const Title = styled.h1`
-  color: white;
+  color: #0f172a;
   font-size: 2rem;
   font-weight: 600;
 `;
@@ -45,19 +45,20 @@ const SCADAGrid = styled.div`
 `;
 
 const SCADASection = styled.div`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #ffffff;
+  
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   padding: 1.5rem;
-  color: white;
+  color: #0f172a;
 `;
 
 const SectionTitle = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: white;
+  color: #0f172a;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -74,7 +75,7 @@ const DataPoint = styled.div`
   transition: all 0.2s ease;
   
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: #ffffff;
   }
 `;
 
@@ -91,7 +92,7 @@ const DataPointValue = styled.div`
 
 const DataPointUnit = styled.div`
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #94a3b8;
   margin-left: 0.25rem;
 `;
 
@@ -106,7 +107,7 @@ const IoTDevice = styled.div`
   transition: all 0.2s ease;
   
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: #ffffff;
   }
 `;
 
@@ -123,7 +124,7 @@ const DeviceName = styled.div`
 
 const DeviceType = styled.div`
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #94a3b8;
 `;
 
 const DeviceStatus = styled.div`
@@ -166,7 +167,7 @@ const AlarmMessage = styled.div`
 
 const AlarmTime = styled.div`
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #94a3b8;
 `;
 
 const SCADA = () => {

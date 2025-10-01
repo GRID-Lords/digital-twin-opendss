@@ -3,19 +3,19 @@ import styled from 'styled-components';
 import { FiAlertTriangle, FiInfo, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 
 const AlertsContainer = styled.div`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   padding: 1.5rem;
-  color: white;
+  color: #f1f5f9;
 `;
 
 const AlertsTitle = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: white;
+  color: #f1f5f9;
 `;
 
 const AlertList = styled.div`
@@ -35,7 +35,7 @@ const AlertItem = styled.div`
   transition: all 0.2s ease;
   
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: #334155;
   }
 `;
 
@@ -56,7 +56,7 @@ const AlertMessage = styled.div`
 
 const AlertTime = styled.div`
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #94a3b8;
 `;
 
 const AlertSeverity = styled.div`
