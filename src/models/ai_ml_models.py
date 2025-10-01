@@ -21,12 +21,14 @@ logger = logging.getLogger(__name__)
 
 class SubstationAnomalyDetector:
     """Anomaly detection for substation assets"""
-    
+
     def __init__(self):
         self.models = {}
         self.scalers = {}
         self.thresholds = {}
         self.is_trained = False
+        self.online_buffer = {}  # Buffer for online learning
+        self.buffer_size = 100  # Retrain after 100 new samples per asset type
     
     def train(self, historical_data: pd.DataFrame):
         """Train anomaly detection models"""
@@ -110,17 +112,78 @@ class SubstationAnomalyDetector:
                     
             except Exception as e:
                 logger.error(f"Error detecting anomaly for {asset_id}: {e}")
-        
+
         return anomalies
+
+    def update_with_new_data(self, asset_type: str, features_dict: Dict):
+        """Add new observation to buffer and retrain if buffer is full"""
+        if asset_type not in self.online_buffer:
+            self.online_buffer[asset_type] = []
+
+        # Add to buffer
+        self.online_buffer[asset_type].append(features_dict)
+
+        # Check if we should retrain
+        if len(self.online_buffer[asset_type]) >= self.buffer_size:
+            logger.info(f"Buffer full for {asset_type}, retraining anomaly detector...")
+
+            # Convert buffer to DataFrame
+            buffer_df = pd.DataFrame(self.online_buffer[asset_type])
+            buffer_df['asset_type'] = asset_type
+
+            # Retrain with buffered data
+            self._retrain_single_type(asset_type, buffer_df)
+
+            # Clear buffer but keep last 20% for continuity
+            keep_size = int(self.buffer_size * 0.2)
+            self.online_buffer[asset_type] = self.online_buffer[asset_type][-keep_size:]
+
+    def _retrain_single_type(self, asset_type: str, new_data: pd.DataFrame):
+        """Retrain model for a specific asset type"""
+        try:
+            features = ['voltage', 'current', 'power', 'temperature', 'health_score']
+            X = new_data[features].fillna(0)
+
+            if len(X) < 50:  # Need minimum data
+                logger.warning(f"Insufficient data for retraining {asset_type}")
+                return
+
+            # Retrain Isolation Forest
+            model = IsolationForest(
+                contamination=0.1,
+                random_state=42,
+                n_estimators=100
+            )
+            model.fit(X)
+
+            # Update scaler
+            scaler = StandardScaler()
+            scaler.fit(X)
+
+            # Recalculate threshold
+            scores = model.decision_function(X)
+            threshold = np.percentile(scores, 10)
+
+            # Update models
+            self.models[asset_type] = model
+            self.scalers[asset_type] = scaler
+            self.thresholds[asset_type] = threshold
+
+            logger.info(f"Successfully retrained anomaly detector for {asset_type}")
+
+        except Exception as e:
+            logger.error(f"Error retraining anomaly detector for {asset_type}: {e}")
 
 class SubstationPredictiveModel:
     """Predictive maintenance model for substation assets"""
-    
+
     def __init__(self):
         self.models = {}
         self.scalers = {}
         self.feature_importance = {}
         self.is_trained = False
+        self.online_buffer = {}  # Buffer for online learning
+        self.buffer_size = 200  # Retrain after 200 new samples per asset type
     
     def train(self, historical_data: pd.DataFrame):
         """Train predictive maintenance models"""
@@ -242,6 +305,70 @@ class SubstationPredictiveModel:
         else:
             return "within_90_days"
 
+    def update_with_new_data(self, asset_type: str, features_dict: Dict, health_score: float):
+        """Add new observation to buffer and retrain if buffer is full"""
+        if asset_type not in self.online_buffer:
+            self.online_buffer[asset_type] = []
+
+        # Add health score to features
+        features_dict['health_score'] = health_score
+
+        # Add to buffer
+        self.online_buffer[asset_type].append(features_dict)
+
+        # Check if we should retrain
+        if len(self.online_buffer[asset_type]) >= self.buffer_size:
+            logger.info(f"Buffer full for {asset_type}, retraining predictive model...")
+
+            # Convert buffer to DataFrame
+            buffer_df = pd.DataFrame(self.online_buffer[asset_type])
+            buffer_df['asset_type'] = asset_type
+
+            # Retrain with buffered data
+            self._retrain_single_type(asset_type, buffer_df)
+
+            # Clear buffer but keep last 20% for continuity
+            keep_size = int(self.buffer_size * 0.2)
+            self.online_buffer[asset_type] = self.online_buffer[asset_type][-keep_size:]
+
+    def _retrain_single_type(self, asset_type: str, new_data: pd.DataFrame):
+        """Retrain model for a specific asset type"""
+        try:
+            features = ['voltage', 'current', 'power', 'temperature', 'age_days']
+            target = 'health_score'
+
+            X = new_data[features].fillna(0)
+            y = new_data[target]
+
+            if len(X) < 100:  # Need minimum data
+                logger.warning(f"Insufficient data for retraining {asset_type}")
+                return
+
+            # Retrain Random Forest
+            model = RandomForestRegressor(
+                n_estimators=100,
+                max_depth=10,
+                random_state=42
+            )
+            model.fit(X, y)
+
+            # Update scaler
+            scaler = StandardScaler()
+            scaler.fit(X)
+
+            # Update feature importance
+            feature_importance = dict(zip(features, model.feature_importances_))
+
+            # Update models
+            self.models[asset_type] = model
+            self.scalers[asset_type] = scaler
+            self.feature_importance[asset_type] = feature_importance
+
+            logger.info(f"Successfully retrained predictive model for {asset_type}")
+
+        except Exception as e:
+            logger.error(f"Error retraining predictive model for {asset_type}: {e}")
+
 class SubstationOptimizer:
     """Optimization model for substation operations"""
     
@@ -338,13 +465,113 @@ class SubstationOptimizer:
 
 class SubstationAIManager:
     """Main AI/ML manager for the digital twin"""
-    
-    def __init__(self):
+
+    def __init__(self, model_dir: str = "models"):
         self.anomaly_detector = SubstationAnomalyDetector()
         self.predictive_model = SubstationPredictiveModel()
         self.optimizer = SubstationOptimizer()
         self.is_initialized = False
-    
+        self.model_dir = model_dir
+
+        # Try to load pre-trained models
+        self.load_pretrained_models()
+
+    def load_pretrained_models(self):
+        """Load pre-trained models from disk if available"""
+        import os
+
+        try:
+            anomaly_path = os.path.join(self.model_dir, 'anomaly_detector.pkl')
+            predictive_path = os.path.join(self.model_dir, 'predictive_maintenance.pkl')
+
+            # Load anomaly detector
+            if os.path.exists(anomaly_path):
+                logger.info(f"📦 Loading pre-trained anomaly detector from {anomaly_path}")
+                self.anomaly_detector = joblib.load(anomaly_path)
+                logger.info(f"✅ Loaded anomaly detector with {len(self.anomaly_detector.models)} asset type models")
+                self.is_initialized = True
+            else:
+                logger.info("⚠️ No pre-trained anomaly detector found")
+
+            # Load predictive model
+            if os.path.exists(predictive_path):
+                logger.info(f"📦 Loading pre-trained predictive model from {predictive_path}")
+                self.predictive_model = joblib.load(predictive_path)
+                logger.info(f"✅ Loaded predictive model with {len(self.predictive_model.models)} asset type models")
+                self.is_initialized = True
+            else:
+                logger.info("⚠️ No pre-trained predictive model found")
+
+            if self.is_initialized:
+                logger.info("🎯 Pre-trained AI models loaded successfully")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load pre-trained models: {e}")
+            logger.info("Will use synthetic training data instead")
+
+    def save_models(self):
+        """Save trained models to disk"""
+        import os
+
+        try:
+            os.makedirs(self.model_dir, exist_ok=True)
+
+            anomaly_path = os.path.join(self.model_dir, 'anomaly_detector.pkl')
+            predictive_path = os.path.join(self.model_dir, 'predictive_maintenance.pkl')
+
+            # Save anomaly detector
+            if self.anomaly_detector.is_trained:
+                joblib.dump(self.anomaly_detector, anomaly_path)
+                logger.info(f"✅ Saved anomaly detector to {anomaly_path}")
+
+            # Save predictive model
+            if self.predictive_model.is_trained:
+                joblib.dump(self.predictive_model, predictive_path)
+                logger.info(f"✅ Saved predictive model to {predictive_path}")
+
+            logger.info("💾 AI models saved successfully")
+
+        except Exception as e:
+            logger.error(f"❌ Error saving models: {e}")
+
+    def update_models_online(self, asset_id: str, asset_data: Dict):
+        """Update models with new data point (online learning)"""
+        try:
+            asset_type = asset_data.get('asset_type')
+            if not asset_type:
+                return
+
+            # Prepare features for anomaly detector
+            anomaly_features = {
+                'voltage': asset_data.get('voltage', 0),
+                'current': asset_data.get('current', 0),
+                'power': asset_data.get('power', 0),
+                'temperature': asset_data.get('temperature', 0),
+                'health_score': asset_data.get('health_score', 100)
+            }
+
+            # Update anomaly detector
+            self.anomaly_detector.update_with_new_data(asset_type, anomaly_features)
+
+            # Prepare features for predictive model
+            predictive_features = {
+                'voltage': asset_data.get('voltage', 0),
+                'current': asset_data.get('current', 0),
+                'power': asset_data.get('power', 0),
+                'temperature': asset_data.get('temperature', 0),
+                'age_days': asset_data.get('age_days', 0)
+            }
+
+            # Update predictive model
+            self.predictive_model.update_with_new_data(
+                asset_type,
+                predictive_features,
+                asset_data.get('health_score', 100)
+            )
+
+        except Exception as e:
+            logger.error(f"Error in online learning update: {e}")
+
     def initialize_with_synthetic_data(self):
         """Initialize AI models with synthetic data for demonstration"""
         try:

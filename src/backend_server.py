@@ -132,7 +132,13 @@ async def startup_event():
 
         # Initialize AI/ML Manager
         ai_manager = SubstationAIManager()
-        ai_manager.initialize_with_synthetic_data()
+
+        # If models are already trained, they will be loaded automatically
+        # Otherwise, initialize with synthetic data
+        if not ai_manager.is_initialized:
+            logger.info("No pre-trained models found, using synthetic data")
+            ai_manager.initialize_with_synthetic_data()
+
         logger.info("AI/ML models initialized")
 
         # Initialize Real-time Monitor
@@ -235,11 +241,47 @@ async def real_time_data_generator():
 # Background task for updating asset data
 async def asset_data_updater():
     """Update asset measurements periodically"""
+    update_counter = 0
+
     while True:
         try:
             if asset_manager:
                 # Simulate measurements for all assets
                 asset_manager.simulate_asset_measurements()
+
+                # Online learning: Update AI models with new asset data
+                if ai_manager and ai_manager.is_initialized:
+                    for asset_id, asset in asset_manager.assets.items():
+                        # Get real-time data
+                        rt_data = asset.real_time_data
+
+                        # Prepare asset data for online learning
+                        voltage = rt_data.get('voltage_kv', asset.electrical.voltage_rating_kv)
+                        current = rt_data.get('current_a', asset.electrical.current_rating_a * 0.7)
+                        power = voltage * current / 1000  # MW
+
+                        # Calculate age in days
+                        age_delta = datetime.now() - asset.commissioned_date
+                        age_days = age_delta.days
+
+                        asset_data = {
+                            'asset_type': asset.asset_type.value,
+                            'voltage': voltage,
+                            'current': current,
+                            'power': power,
+                            'temperature': asset.thermal.temperature_celsius,
+                            'health_score': asset.health.overall_health,
+                            'age_days': age_days
+                        }
+
+                        # Update models online
+                        ai_manager.update_models_online(asset_id, asset_data)
+
+                    # Periodically save updated models (every 100 updates = ~8 minutes)
+                    update_counter += 1
+                    if update_counter % 100 == 0:
+                        ai_manager.save_models()
+                        logger.info(f"💾 AI models saved after {update_counter} updates")
 
                 # Log critical assets if any
                 critical = asset_manager.get_critical_assets(health_threshold=70)
