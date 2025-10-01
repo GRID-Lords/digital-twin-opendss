@@ -30,9 +30,12 @@ from src.data_manager import data_manager
 from src.integration.scada_integration import SCADAIntegrationManager
 from src.simulation.load_flow import LoadFlowAnalysis
 from src.models.ai_ml_models import SubstationAIManager
+from src.models.asset_models import SubstationAssetManager  # Import asset manager
 from src.monitoring.real_time_monitor import RealTimeMonitor
 from src.visualization.circuit_visualizer import OpenDSSVisualizer as CircuitVisualizer
 from src.api.anomaly_endpoints import router as anomaly_router
+from src.api.asset_endpoints import router as asset_router
+from src.api.historical_endpoints import router as historical_router
 from src.database import db  # Import database module
 
 # Configure logging
@@ -46,8 +49,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Include anomaly router
+# Include routers
 app.include_router(anomaly_router)
+app.include_router(asset_router)
+app.include_router(historical_router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -64,6 +69,7 @@ load_flow = None
 ai_manager = None
 monitor = None
 visualizer = None
+asset_manager = None  # Add asset manager instance
 connected_websockets = []
 
 # Data models
@@ -88,10 +94,22 @@ class ControlCommand(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize all system components"""
-    global scada, load_flow, ai_manager, monitor, visualizer
+    global scada, load_flow, ai_manager, monitor, visualizer, asset_manager
 
     try:
         logger.info("Initializing Digital Twin Backend...")
+
+        # Initialize Asset Manager
+        asset_manager = SubstationAssetManager()
+        logger.info(f"Asset Manager initialized with {len(asset_manager.assets)} assets")
+
+        # Set asset manager in asset endpoints
+        from src.api.asset_endpoints import set_asset_manager
+        set_asset_manager(asset_manager)
+
+        # Set managers in historical endpoints
+        from src.api.historical_endpoints import set_managers
+        set_managers(data_manager, asset_manager)
 
         # Initialize SCADA
         scada_config = {
@@ -132,6 +150,7 @@ async def startup_event():
         # Start background tasks
         asyncio.create_task(real_time_data_generator())
         asyncio.create_task(websocket_broadcaster())
+        asyncio.create_task(asset_data_updater())  # Add asset updater task
 
         logger.info("Digital Twin Backend started successfully")
 
@@ -212,6 +231,26 @@ async def real_time_data_generator():
         except Exception as e:
             logger.error(f"Error in data generator: {e}")
             await asyncio.sleep(5)
+
+# Background task for updating asset data
+async def asset_data_updater():
+    """Update asset measurements periodically"""
+    while True:
+        try:
+            if asset_manager:
+                # Simulate measurements for all assets
+                asset_manager.simulate_asset_measurements()
+
+                # Log critical assets if any
+                critical = asset_manager.get_critical_assets(health_threshold=70)
+                if critical:
+                    logger.warning(f"Found {len(critical)} critical assets")
+
+            await asyncio.sleep(5)  # Update every 5 seconds
+
+        except Exception as e:
+            logger.error(f"Error in asset updater: {e}")
+            await asyncio.sleep(10)
 
 # Background task for WebSocket broadcasting
 async def websocket_broadcaster():
@@ -355,9 +394,13 @@ def calculate_health_score(asset_type: str, temperature: float, load_percent: fl
 
     return max(0, min(100, health))
 
+# DEPRECATED - Using asset_endpoints.py instead
+# The old get_assets function has been replaced with asset_endpoints.py
+# which uses the proper SubstationAssetManager
+"""
 @app.get("/api/assets")
-async def get_assets():
-    """Get all substation assets with dynamic health scores from database"""
+async def get_assets_old():
+    # Get all substation assets with dynamic health scores from database
 
     # Get latest metrics from database (last 24 hours)
     recent_metrics = await data_manager.get_historical_metrics(hours=24)
@@ -728,6 +771,7 @@ async def get_assets():
     ))
 
     return assets
+"""
 
 @app.get("/api/metrics")
 async def get_metrics():
