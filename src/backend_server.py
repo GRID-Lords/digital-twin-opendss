@@ -872,52 +872,48 @@ async def run_simulation(request: SimulationRequest):
 @app.get("/api/ai/analysis")
 async def get_ai_analysis():
     """Get AI/ML analysis results"""
-    if not ai_manager:
+    if not ai_manager or not asset_manager:
         raise HTTPException(status_code=503, detail="AI system not available")
 
     try:
-        # Generate sample data for demonstration
-        sample_data = pd.DataFrame(np.random.randn(10, 10))
+        # Prepare current asset data for analysis
+        current_data = {}
+        for asset_id, asset in asset_manager.assets.items():
+            rt_data = asset.real_time_data
+            voltage = rt_data.get('voltage_kv', asset.electrical.voltage_rating_kv)
+            current = rt_data.get('current_a', asset.electrical.current_rating_a * 0.7)
 
-        # Use actual AI manager methods with proper data format
-        current_data = {
-            "PowerTransformer_T1": {
-                "voltage": 400 + np.random.normal(0, 5),
-                "current": 200 + np.random.normal(0, 10),
-                "power": 80000 + np.random.normal(0, 1000),
-                "temperature": 65 + np.random.normal(0, 5),
-                "health_score": 85 + np.random.normal(0, 3)
+            current_data[asset_id] = {
+                'asset_type': asset.asset_type.value,
+                'voltage': voltage,
+                'current': current,
+                'power': voltage * current / 1000,
+                'temperature': asset.thermal.temperature_celsius,
+                'health_score': asset.health.overall_health,
+                'age_days': (datetime.now() - asset.commissioned_date).days
             }
+
+        # Get anomaly detection results
+        anomalies = ai_manager.anomaly_detector.detect_anomalies(current_data)
+
+        # Get predictive maintenance results
+        predictions = ai_manager.predictive_model.predict_health_degradation(current_data)
+
+        # Get optimization recommendations
+        metrics = {
+            'total_power': sum(d['power'] for d in current_data.values()),
+            'frequency': 50.0,
+            'voltage_stability': 98.5,
+            'efficiency': 96.8,
+            'power_factor': 0.95
         }
-
-        # Get health predictions using actual method via predictive_model
-        health_predictions = ai_manager.predictive_model.predict_health_degradation(current_data)
-        anomalies = [1 if p.get("predicted_health", 100) < 70 else 0 for p in health_predictions]
-        failures = [(100 - p.get("predicted_health", 100)) / 100 for p in health_predictions]
-
-        # Calculate statistics
-        anomaly_rate = np.mean(anomalies) * 100
-        avg_failure_prob = np.mean(failures) * 100
+        optimization = ai_manager.optimizer.optimize_power_flow(metrics)
 
         return {
             "timestamp": datetime.now().isoformat(),
-            "analysis": {
-                "anomaly_detection": {
-                    "rate": f"{anomaly_rate:.2f}%",
-                    "detected_count": int(np.sum(anomalies)),
-                    "total_samples": len(anomalies)
-                },
-                "failure_prediction": {
-                    "average_probability": f"{avg_failure_prob:.2f}%",
-                    "high_risk_assets": [],
-                    "maintenance_recommendations": []
-                },
-                "optimization": {
-                    "load_balancing": "optimal",
-                    "voltage_profile": "within_limits",
-                    "losses": "3.2%"
-                }
-            },
+            "anomalies": anomalies,
+            "predictions": predictions,
+            "optimization": optimization,
             "model_confidence": 0.92
         }
     except Exception as e:
