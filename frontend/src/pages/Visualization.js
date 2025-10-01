@@ -4,6 +4,7 @@ import { FiMonitor, FiDownload, FiRefreshCw, FiMaximize2, FiCpu, FiGrid } from '
 import toast from 'react-hot-toast';
 import SubstationVisualization2D from '../components/SubstationVisualization2D';
 import SubstationVisualization3D from '../components/SubstationVisualization3D';
+import AnomalySimulationPanel from '../components/AnomalySimulationPanel';
 
 const VisualizationContainer = styled.div`
   display: flex;
@@ -220,6 +221,8 @@ const Visualization = () => {
           <SubstationVisualization3D />
         )}
       </VisualizationWrapper>
+
+      <AnomalySimulationPanel />
     </VisualizationContainer>
   );
 };
