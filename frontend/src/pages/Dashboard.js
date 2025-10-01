@@ -6,6 +6,7 @@ import AssetStatusChart from '../components/AssetStatusChart';
 import PowerFlowChart from '../components/PowerFlowChart';
 import VoltageProfileChart from '../components/VoltageProfileChart';
 import RecentAlerts from '../components/RecentAlerts';
+import DataManagement from '../components/DataManagement';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -21,13 +22,13 @@ const DashboardHeader = styled.div`
 `;
 
 const Title = styled.h1`
-  color: white;
+  color: #f1f5f9;
   font-size: 2rem;
-  font-weight: 600;
+  font-weight: 700;
 `;
 
 const LastUpdated = styled.div`
-  color: rgba(255, 255, 255, 0.7);
+  color: #94a3b8;
   font-size: 0.9rem;
 `;
 
@@ -43,7 +44,7 @@ const ChartsGrid = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
   margin-bottom: 2rem;
-  
+
   @media (max-width: 1200px) {
     grid-template-columns: 1fr;
   }
@@ -65,28 +66,28 @@ const Dashboard = () => {
     {
       title: 'Total Power',
       value: `${metrics.total_power?.toFixed(1) || 0} MW`,
-      icon: '⚡',
-      color: '#4ade80',
+      icon: '',
+      color: '#10b981',
       trend: '+2.3%'
     },
     {
       title: 'Efficiency',
       value: `${metrics.efficiency?.toFixed(1) || 0}%`,
-      icon: '📊',
+      icon: '',
       color: '#3b82f6',
       trend: '+0.5%'
     },
     {
       title: 'Voltage Stability',
       value: `${metrics.voltage_stability?.toFixed(1) || 0}%`,
-      icon: '📈',
+      icon: '',
       color: '#8b5cf6',
       trend: '+1.2%'
     },
     {
       title: 'Frequency',
       value: `${metrics.frequency?.toFixed(2) || 0} Hz`,
-      icon: '🔄',
+      icon: '',
       color: '#f59e0b',
       trend: '±0.1%'
     }
@@ -95,16 +96,16 @@ const Dashboard = () => {
   return (
     <DashboardContainer>
       <DashboardHeader>
-        <Title>🇮🇳 Substation Overview</Title>
+        <Title>Substation Overview</Title>
         <LastUpdated>
           Last updated: {new Date().toLocaleTimeString()}
         </LastUpdated>
       </DashboardHeader>
 
       <MetricsGrid>
-        {metricCards.map((metric, index) => (
+        {metricCards.map((metric) => (
           <MetricCard
-            key={index}
+            key={metric.title}
             title={metric.title}
             value={metric.value}
             icon={metric.icon}
@@ -116,14 +117,15 @@ const Dashboard = () => {
 
       <ChartsGrid>
         <AssetStatusChart assets={assets} />
-        <PowerFlowChart metrics={metrics} />
+        <PowerFlowChart />
+        <FullWidthChart>
+          <VoltageProfileChart />
+        </FullWidthChart>
       </ChartsGrid>
 
-      <FullWidthChart>
-        <VoltageProfileChart assets={assets} />
-      </FullWidthChart>
-
       <RecentAlerts />
+
+      <DataManagement />
     </DashboardContainer>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import styled from 'styled-components';
 import { useDigitalTwin } from '../context/DigitalTwinContext';
-import { FiTrendingUp, FiAlertTriangle, FiTarget, FiBarChart3 } from 'react-icons/fi';
+import { FiTrendingUp, FiAlertTriangle, FiTarget, FiBarChart } from 'react-icons/fi';
 
 const AnalyticsContainer = styled.div`
   display: flex;
@@ -17,7 +17,7 @@ const PageHeader = styled.div`
 `;
 
 const Title = styled.h1`
-  color: white;
+  color: #f1f5f9;
   font-size: 2rem;
   font-weight: 600;
 `;
@@ -33,19 +33,19 @@ const AnalyticsGrid = styled.div`
 `;
 
 const AnalyticsSection = styled.div`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   padding: 1.5rem;
-  color: white;
+  color: #f1f5f9;
 `;
 
 const SectionTitle = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: white;
+  color: #f1f5f9;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -75,7 +75,7 @@ const AnomalyAsset = styled.div`
 
 const AnomalyScore = styled.div`
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #94a3b8;
 `;
 
 const AnomalySeverity = styled.div`
@@ -111,7 +111,7 @@ const PredictionAsset = styled.div`
 
 const PredictionHealth = styled.div`
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #94a3b8;
 `;
 
 const PredictionUrgency = styled.div`
@@ -161,7 +161,7 @@ const OptimizationAction = styled.div`
 
 const OptimizationDescription = styled.div`
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #94a3b8;
 `;
 
 const OptimizationPriority = styled.div`
@@ -202,7 +202,7 @@ const Analytics = () => {
   return (
     <AnalyticsContainer>
       <PageHeader>
-        <Title>🧠 AI/ML Analytics</Title>
+        <Title>AI/ML Analytics</Title>
       </PageHeader>
 
       <AnalyticsGrid>
@@ -224,7 +224,7 @@ const Analytics = () => {
               </AnomalyItem>
             ))
           ) : (
-            <div style={{ color: 'rgba(255, 255, 255, 0.6)', textAlign: 'center', padding: '2rem' }}>
+            <div style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>
               No anomalies detected
             </div>
           )}
@@ -250,7 +250,7 @@ const Analytics = () => {
               </PredictionItem>
             ))
           ) : (
-            <div style={{ color: 'rgba(255, 255, 255, 0.6)', textAlign: 'center', padding: '2rem' }}>
+            <div style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>
               No predictions available
             </div>
           )}
@@ -275,7 +275,7 @@ const Analytics = () => {
             </OptimizationItem>
           ))
         ) : (
-          <div style={{ color: 'rgba(255, 255, 255, 0.6)', textAlign: 'center', padding: '2rem' }}>
+          <div style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>
             No optimization recommendations available
           </div>
         )}
@@ -288,7 +288,7 @@ const Analytics = () => {
             borderRadius: '8px',
             textAlign: 'center'
           }}>
-            <div style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '0.5rem' }}>
+            <div style={{ fontSize: '0.9rem', color: '#94a3b8', marginBottom: '0.5rem' }}>
               Overall Optimization Score
             </div>
             <div style={{ fontSize: '2rem', fontWeight: '600', color: '#4ade80' }}>

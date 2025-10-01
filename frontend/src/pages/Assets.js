@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useDigitalTwin } from '../context/DigitalTwinContext';
-import { FiCpu, FiActivity, FiSettings, FiPower } from 'react-icons/fi';
+import { Cpu, Activity, Settings, Power } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AssetsContainer = styled.div`
@@ -18,15 +18,15 @@ const PageHeader = styled.div`
 `;
 
 const Title = styled.h1`
-  color: white;
+  color: #f1f5f9;
   font-size: 2rem;
-  font-weight: 600;
+  font-weight: 700;
 `;
 
 const ControlButton = styled.button`
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: #334155;
+  border: 1px solid #475569;
+  color: #f1f5f9;
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
   cursor: pointer;
@@ -34,9 +34,12 @@ const ControlButton = styled.button`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  font-weight: 500;
+
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: #475569;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   }
 `;
 
@@ -47,17 +50,16 @@ const AssetsGrid = styled.div`
 `;
 
 const AssetCard = styled.div`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   padding: 1.5rem;
-  color: white;
   transition: all 0.3s ease;
-  
+
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
   }
 `;
 
@@ -71,6 +73,7 @@ const AssetHeader = styled.div`
 const AssetName = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
+  color: #f1f5f9;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -84,17 +87,21 @@ const AssetStatus = styled.div`
   text-transform: uppercase;
   background: ${props => {
     switch (props.status) {
-      case 'healthy': return 'rgba(74, 222, 128, 0.2)';
-      case 'warning': return 'rgba(245, 158, 11, 0.2)';
-      case 'fault': return 'rgba(239, 68, 68, 0.2)';
-      default: return 'rgba(107, 114, 128, 0.2)';
+      case 'operational': return '#dcfce7';
+      case 'healthy': return '#dcfce7';
+      case 'warning': return '#fed7aa';
+      case 'fault': return '#fee2e2';
+      case 'closed': return '#dbeafe';
+      default: return '#f3f4f6';
     }
   }};
   color: ${props => {
     switch (props.status) {
-      case 'healthy': return '#4ade80';
-      case 'warning': return '#f59e0b';
-      case 'fault': return '#ef4444';
+      case 'operational': return '#166534';
+      case 'healthy': return '#166534';
+      case 'warning': return '#c2410c';
+      case 'fault': return '#991b1b';
+      case 'closed': return '#1e40af';
       default: return '#6b7280';
     }
   }};
@@ -115,7 +122,7 @@ const Metric = styled.div`
 
 const MetricLabel = styled.div`
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 `;
@@ -123,7 +130,7 @@ const MetricLabel = styled.div`
 const MetricValue = styled.div`
   font-size: 1.1rem;
   font-weight: 600;
-  color: white;
+  color: #f1f5f9;
 `;
 
 const AssetActions = styled.div`
@@ -133,26 +140,30 @@ const AssetActions = styled.div`
 `;
 
 const ActionButton = styled.button`
-  background: ${props => props.variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)'};
-  border: 1px solid ${props => props.variant === 'danger' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.2)'};
-  color: ${props => props.variant === 'danger' ? '#ef4444' : 'white'};
+  background: ${props => props.variant === 'danger' ? '#fee2e2' : '#f1f5f9'};
+  border: 1px solid ${props => props.variant === 'danger' ? '#fecaca' : '#e2e8f0'};
+  color: ${props => props.variant === 'danger' ? '#991b1b' : '#0f172a'};
   padding: 0.5rem 1rem;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.8rem;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  
+
   &:hover {
-    background: ${props => props.variant === 'danger' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.2)'};
+    background: ${props => props.variant === 'danger' ? '#fecaca' : '#e2e8f0'};
   }
 `;
 
 const Assets = () => {
   const { assets, controlAsset, loading } = useDigitalTwin();
   const [selectedAsset, setSelectedAsset] = useState(null);
+
+  // Convert assets array to the expected format or use as-is if already an object
+  const assetsData = Array.isArray(assets) ? assets : Object.values(assets || {});
 
   const handleControlAsset = async (assetId, action) => {
     try {
@@ -165,11 +176,11 @@ const Assets = () => {
 
   const getAssetIcon = (assetType) => {
     switch (assetType) {
-      case 'PowerTransformer': return <FiCpu />;
-      case 'DistributionTransformer': return <FiCpu />;
-      case 'CircuitBreaker': return <FiPower />;
-      case 'IndustrialLoad': return <FiActivity />;
-      default: return <FiSettings />;
+      case 'PowerTransformer': return <Cpu />;
+      case 'DistributionTransformer': return <Cpu />;
+      case 'CircuitBreaker': return <Power />;
+      case 'IndustrialLoad': return <Activity />;
+      default: return <Settings />;
     }
   };
 
@@ -202,42 +213,48 @@ const Assets = () => {
   return (
     <AssetsContainer>
       <PageHeader>
-        <Title>🏭 Asset Management</Title>
+        <Title>Asset Management</Title>
         <ControlButton>
-          <FiSettings />
+          <Settings />
           Bulk Operations
         </ControlButton>
       </PageHeader>
 
       <AssetsGrid>
-        {Object.entries(assets).map(([assetId, asset]) => (
-          <AssetCard key={assetId}>
+        {assetsData.map((asset) => (
+          <AssetCard key={asset.id}>
             <AssetHeader>
               <AssetName>
-                {getAssetIcon(asset.asset_type)}
-                {assetId}
+                {getAssetIcon(asset.type || asset.asset_type)}
+                {asset.name || asset.id}
               </AssetName>
-              <AssetStatus status={asset.status}>
-                {asset.status}
+              <AssetStatus status={asset.status || 'operational'}>
+                {asset.status || 'operational'}
               </AssetStatus>
             </AssetHeader>
 
             <AssetMetrics>
-              <Metric>
-                <MetricLabel>Voltage</MetricLabel>
-                <MetricValue>{asset.voltage?.toFixed(1) || 0} kV</MetricValue>
-              </Metric>
-              <Metric>
-                <MetricLabel>Power</MetricLabel>
-                <MetricValue>{asset.power?.toFixed(1) || 0} kW</MetricValue>
-              </Metric>
-              <Metric>
-                <MetricLabel>Temperature</MetricLabel>
-                <MetricValue>{asset.temperature?.toFixed(1) || 0}°C</MetricValue>
-              </Metric>
+              {asset.parameters?.voltage && (
+                <Metric>
+                  <MetricLabel>Voltage</MetricLabel>
+                  <MetricValue>{asset.parameters.voltage}</MetricValue>
+                </Metric>
+              )}
+              {asset.parameters?.rating && (
+                <Metric>
+                  <MetricLabel>Rating</MetricLabel>
+                  <MetricValue>{asset.parameters.rating}</MetricValue>
+                </Metric>
+              )}
+              {asset.power !== undefined && (
+                <Metric>
+                  <MetricLabel>Power</MetricLabel>
+                  <MetricValue>{asset.power?.toFixed(1) || 0} kW</MetricValue>
+                </Metric>
+              )}
               <Metric>
                 <MetricLabel>Health</MetricLabel>
-                <MetricValue>{asset.health_score?.toFixed(1) || 0}%</MetricValue>
+                <MetricValue>{asset.health?.toFixed(1) || asset.health_score?.toFixed(1) || 0}%</MetricValue>
               </Metric>
             </AssetMetrics>
 
@@ -246,7 +263,7 @@ const Assets = () => {
                 <ActionButton
                   key={action.action}
                   variant={action.variant}
-                  onClick={() => handleControlAsset(assetId, action.action)}
+                  onClick={() => handleControlAsset(asset.id, action.action)}
                 >
                   {action.label}
                 </ActionButton>

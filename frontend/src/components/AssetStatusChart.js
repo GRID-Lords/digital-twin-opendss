@@ -3,19 +3,18 @@ import styled from 'styled-components';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 const ChartContainer = styled.div`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   padding: 1.5rem;
-  color: white;
 `;
 
 const ChartTitle = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: white;
+  color: #f1f5f9;
 `;
 
 const StatusLegend = styled.div`
@@ -30,6 +29,7 @@ const StatusItem = styled.div`
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
+  color: #94a3b8;
 `;
 
 const StatusDot = styled.div`
@@ -40,17 +40,6 @@ const StatusDot = styled.div`
 `;
 
 const AssetStatusChart = ({ assets }) => {
-  const statusCounts = Object.values(assets).reduce((acc, asset) => {
-    acc[asset.status] = (acc[asset.status] || 0) + 1;
-    return acc;
-  }, {});
-
-  const data = Object.entries(statusCounts).map(([status, count]) => ({
-    name: status.charAt(0).toUpperCase() + status.slice(1),
-    value: count,
-    color: getStatusColor(status)
-  }));
-
   const COLORS = {
     healthy: '#4ade80',
     warning: '#f59e0b',
@@ -61,6 +50,17 @@ const AssetStatusChart = ({ assets }) => {
   function getStatusColor(status) {
     return COLORS[status] || '#6b7280';
   }
+
+  const statusCounts = Object.values(assets).reduce((acc, asset) => {
+    acc[asset.status] = (acc[asset.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  const data = Object.entries(statusCounts).map(([status, count]) => ({
+    name: status.charAt(0).toUpperCase() + status.slice(1),
+    value: count,
+    color: getStatusColor(status)
+  }));
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {

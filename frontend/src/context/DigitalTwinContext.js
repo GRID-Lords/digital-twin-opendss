@@ -15,6 +15,9 @@ export const useDigitalTwin = () => {
 export const DigitalTwinProvider = ({ children }) => {
   const [assets, setAssets] = useState({});
   const [metrics, setMetrics] = useState({});
+  const [historicalMetrics, setHistoricalMetrics] = useState([]);
+  const [cacheStats, setCacheStats] = useState({});
+  const [realtimeSummary, setRealtimeSummary] = useState({});
   const [scadaData, setScadaData] = useState({});
   const [aiAnalysis, setAiAnalysis] = useState({});
   const [iotDevices, setIotDevices] = useState({});
@@ -130,6 +133,49 @@ export const DigitalTwinProvider = ({ children }) => {
     }
   };
 
+  // New API functions for optimized data management
+  const fetchHistoricalMetrics = async (hours = 24) => {
+    try {
+      const response = await axios.get(`/api/metrics/historical?hours=${hours}`);
+      setHistoricalMetrics(response.data.data || []);
+      return response.data;
+    } catch (error) {
+      toast.error('Failed to fetch historical metrics');
+      throw error;
+    }
+  };
+
+  const fetchCacheStats = async () => {
+    try {
+      const response = await axios.get('/api/cache/stats');
+      setCacheStats(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch cache stats:', error);
+    }
+  };
+
+  const fetchRealtimeSummary = async () => {
+    try {
+      const response = await axios.get('/api/realtime/summary');
+      setRealtimeSummary(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch realtime summary:', error);
+    }
+  };
+
+  const triggerDataCleanup = async () => {
+    try {
+      const response = await axios.post('/api/data/cleanup');
+      toast.success('Data cleanup completed');
+      return response.data;
+    } catch (error) {
+      toast.error('Failed to trigger data cleanup');
+      throw error;
+    }
+  };
+
   // Control functions
   const controlAsset = async (assetId, action, parameters = {}) => {
     try {
@@ -157,44 +203,63 @@ export const DigitalTwinProvider = ({ children }) => {
     }
   };
 
-  // Auto-refresh data
+  // Optimized auto-refresh strategy
   useEffect(() => {
-    const refreshData = () => {
+    // Fetch real-time data from cache frequently
+    const refreshRealtimeData = () => {
+      fetchRealtimeSummary(); // Get cached real-time data
+      fetchMetrics(); // Get current metrics
+    };
+
+    // Fetch slower-changing data less frequently
+    const refreshSlowData = () => {
       fetchAssets();
-      fetchMetrics();
       fetchSCADAData();
       fetchAIAnalysis();
-      fetchIoTDevices();
+      fetchCacheStats();
     };
 
     // Initial load
-    refreshData();
+    refreshRealtimeData();
+    refreshSlowData();
+    fetchHistoricalMetrics(24); // Load last 24 hours
 
-    // Refresh every 30 seconds
-    const interval = setInterval(refreshData, 30000);
+    // Different refresh intervals for different data types
+    const realtimeInterval = setInterval(refreshRealtimeData, 10000); // Every 10 seconds for real-time
+    const slowInterval = setInterval(refreshSlowData, 60000); // Every 60 seconds for slow data
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(realtimeInterval);
+      clearInterval(slowInterval);
+    };
   }, []);
 
   const value = {
     // State
     assets,
     metrics,
+    historicalMetrics,
+    cacheStats,
+    realtimeSummary,
     scadaData,
     aiAnalysis,
     iotDevices,
     loading,
     error,
     wsConnected,
-    
+
     // Actions
     fetchAssets,
     fetchMetrics,
+    fetchHistoricalMetrics,
+    fetchCacheStats,
+    fetchRealtimeSummary,
     fetchSCADAData,
     fetchAIAnalysis,
     fetchIoTDevices,
     controlAsset,
     runFaultAnalysis,
+    triggerDataCleanup,
   };
 
   return (

@@ -26,3 +26,6 @@ env/
 # Temporary files
 *.tmp
 *.temp
+node_modules/
+
+frontend/node_modules/

@@ -156,27 +156,23 @@ New Reactor.ShuntReactor400kV phases=3
 ~ Bus1=Bus400kV_1.1.2.3.0
 ~ kV=400
 ~ kvar=50000
-~ States=(1)
 
 ! Shunt Reactors (220 kV)
 New Reactor.ShuntReactor220kV phases=3
 ~ Bus1=Bus220kV_1.1.2.3.0
 ~ kV=220
 ~ kvar=30000
-~ States=(1)
 
 ! Capacitor Banks (33 kV)
 New Capacitor.CapBank33kV_1 phases=3
 ~ Bus1=Bus33kV_1.1.2.3.0
 ~ kV=33
 ~ kvar=10000
-~ States=(1)
 
 New Capacitor.CapBank33kV_2 phases=3
 ~ Bus1=Bus33kV_2.1.2.3.0
 ~ kV=33
 ~ kvar=8000
-~ States=(1)
 
 ! ============================================================================
 ! 9. PROTECTIVE DEVICES AND MONITORING
@@ -240,17 +236,3 @@ New Fault.Fault220kV phases=3
 ! ============================================================================
 CalcVoltageBases
 Solve
-
-! Export results for digital twin
-Export Circuit elem=y
-Export BusCoords
-Export Monitors VoltMonitor400kV
-Export Monitors VoltMonitor220kV_1
-Export Monitors VoltMonitor220kV_2
-Export Monitors CurrentMonitor400kV
-Export Monitors CurrentMonitor220kV_1
-Export Monitors PowerMonitor400kV
-Export Monitors PowerMonitor220kV
-Export Meter GridMeter
-Export Meter DistMeter1
-Export Meter DistMeter2

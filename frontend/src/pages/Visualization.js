@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { FiMonitor, FiDownload, FiRefreshCw, FiMaximize2 } from 'react-icons/fi';
+import { FiMonitor, FiDownload, FiRefreshCw, FiMaximize2, FiCpu, FiGrid } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import SubstationVisualization2D from '../components/SubstationVisualization2D';
+import SubstationVisualization3D from '../components/SubstationVisualization3D';
 
 const VisualizationContainer = styled.div`
   display: flex;
@@ -17,7 +19,7 @@ const PageHeader = styled.div`
 `;
 
 const Title = styled.h1`
-  color: white;
+  color: #f1f5f9;
   font-size: 2rem;
   font-weight: 600;
 `;
@@ -28,9 +30,9 @@ const ControlButtons = styled.div`
 `;
 
 const ControlButton = styled.button`
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: ${props => props.active ? 'rgba(99, 102, 241, 0.8)' : '#334155'};
+  border: 1px solid ${props => props.active ? '#6366f1' : '#475569'};
+  color: #f1f5f9;
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
   cursor: pointer;
@@ -38,276 +40,186 @@ const ControlButton = styled.button`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  
+
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: ${props => props.active ? 'rgba(99, 102, 241, 0.9)' : '#475569'};
   }
 `;
 
-const VisualizationGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  
-  @media (max-width: 1200px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const VisualizationCard = styled.div`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 1.5rem;
-  color: white;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-  }
-`;
-
-const CardHeader = styled.div`
+const TabButtons = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
+  gap: 1rem;
+  margin-bottom: 0;
 `;
 
-const CardTitle = styled.h3`
-  font-size: 1.1rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const CardActions = styled.div`
-  display: flex;
-  gap: 0.5rem;
-`;
-
-const ActionButton = styled.button`
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  padding: 0.5rem;
-  border-radius: 6px;
+const TabButton = styled.button`
+  background: ${props => props.active ? 'rgba(99, 102, 241, 0.8)' : '#334155'};
+  border: 1px solid ${props => props.active ? '#6366f1' : '#475569'};
+  color: #f1f5f9;
+  padding: 1rem 2rem;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  justify-content: center;
-  
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: ${props => props.active ? '600' : '400'};
+
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: ${props => props.active ? 'rgba(99, 102, 241, 0.9)' : '#475569'};
+    transform: translateY(-2px);
+  }
+
+  svg {
+    font-size: 1.2rem;
   }
 `;
 
-const VisualizationPlaceholder = styled.div`
-  height: 300px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px dashed rgba(255, 255, 255, 0.3);
+const VisualizationWrapper = styled.div`
+  background: #1e293b;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  padding: 2rem;
+  min-height: 600px;
+`;
+
+const InfoBar = styled.div`
+  display: flex;
+  justify-content: space-around;
+  background: #1e293b;
   border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+`;
+
+const InfoItem = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.6);
-  text-align: center;
-  gap: 1rem;
 `;
 
-const PlaceholderIcon = styled.div`
-  font-size: 3rem;
-  opacity: 0.5;
+const InfoLabel = styled.span`
+  color: #94a3b8;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
 `;
 
-const PlaceholderText = styled.div`
-  font-size: 1rem;
-  font-weight: 500;
-`;
-
-const PlaceholderSubtext = styled.div`
-  font-size: 0.8rem;
-  opacity: 0.7;
-`;
-
-const FullWidthCard = styled(VisualizationCard)`
-  grid-column: 1 / -1;
+const InfoValue = styled.span`
+  color: #f1f5f9;
+  font-size: 1.5rem;
+  font-weight: 600;
 `;
 
 const Visualization = () => {
-  const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('2D');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [systemMetrics, setSystemMetrics] = useState({
+    totalLoad: 330,
+    systemHealth: 92,
+    activeAlarms: 2,
+    onlineAssets: 45
+  });
 
-  const handleGenerateNetwork = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/visualization/network');
-      if (response.ok) {
-        toast.success('Network diagram generated successfully');
-      } else {
-        throw new Error('Failed to generate network diagram');
-      }
-    } catch (error) {
-      toast.error('Failed to generate network diagram');
-    } finally {
-      setLoading(false);
+  const handleFullscreen = () => {
+    if (!isFullscreen) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
     }
+    setIsFullscreen(!isFullscreen);
   };
 
-  const handleDownload = (type) => {
-    toast.success(`${type} download started`);
+  const handleExport = () => {
+    // Export current visualization as image
+    toast.success('Exporting visualization...');
+    // Implementation would capture canvas/svg and download
   };
 
-  const handleRefresh = (type) => {
-    toast.success(`${type} refreshed`);
-  };
+  const handleRefresh = async () => {
+    toast.loading('Refreshing data...', { id: 'refresh' });
 
-  const handleFullscreen = (type) => {
-    toast.success(`${type} opened in fullscreen`);
+    try {
+      // Fetch latest metrics from API
+      const response = await fetch('/api/metrics');
+      const data = await response.json();
+
+      setSystemMetrics({
+        totalLoad: data.total_load || 330,
+        systemHealth: data.system_health || 92,
+        activeAlarms: data.alerts?.length || 0,
+        onlineAssets: data.operational_assets || 45
+      });
+
+      toast.success('Data refreshed!', { id: 'refresh' });
+    } catch (error) {
+      toast.error('Failed to refresh data', { id: 'refresh' });
+    }
   };
 
   return (
     <VisualizationContainer>
       <PageHeader>
-        <Title>📊 Visualization Center</Title>
+        <Title>Substation Visualization & Control</Title>
         <ControlButtons>
-          <ControlButton onClick={handleGenerateNetwork} disabled={loading}>
+          <ControlButton onClick={handleRefresh}>
             <FiRefreshCw />
-            {loading ? 'Generating...' : 'Generate All'}
+            Refresh
+          </ControlButton>
+          <ControlButton onClick={handleExport}>
+            <FiDownload />
+            Export
+          </ControlButton>
+          <ControlButton onClick={handleFullscreen}>
+            <FiMaximize2 />
+            Fullscreen
           </ControlButton>
         </ControlButtons>
       </PageHeader>
 
-      <VisualizationGrid>
-        <VisualizationCard>
-          <CardHeader>
-            <CardTitle>
-              <FiMonitor />
-              Network Diagram
-            </CardTitle>
-            <CardActions>
-              <ActionButton onClick={() => handleRefresh('Network Diagram')}>
-                <FiRefreshCw />
-              </ActionButton>
-              <ActionButton onClick={() => handleDownload('Network Diagram')}>
-                <FiDownload />
-              </ActionButton>
-              <ActionButton onClick={() => handleFullscreen('Network Diagram')}>
-                <FiMaximize2 />
-              </ActionButton>
-            </CardActions>
-          </CardHeader>
-          <VisualizationPlaceholder>
-            <PlaceholderIcon>🔌</PlaceholderIcon>
-            <PlaceholderText>Network Diagram</PlaceholderText>
-            <PlaceholderSubtext>Professional electrical network diagram with power flow annotations</PlaceholderSubtext>
-          </VisualizationPlaceholder>
-        </VisualizationCard>
+      <InfoBar>
+        <InfoItem>
+          <InfoLabel>Total Load</InfoLabel>
+          <InfoValue>{systemMetrics.totalLoad} MW</InfoValue>
+        </InfoItem>
+        <InfoItem>
+          <InfoLabel>System Health</InfoLabel>
+          <InfoValue>{systemMetrics.systemHealth}%</InfoValue>
+        </InfoItem>
+        <InfoItem>
+          <InfoLabel>Active Alarms</InfoLabel>
+          <InfoValue>{systemMetrics.activeAlarms}</InfoValue>
+        </InfoItem>
+        <InfoItem>
+          <InfoLabel>Online Assets</InfoLabel>
+          <InfoValue>{systemMetrics.onlineAssets}</InfoValue>
+        </InfoItem>
+      </InfoBar>
 
-        <VisualizationCard>
-          <CardHeader>
-            <CardTitle>
-              <FiMonitor />
-              Single-Line Diagram
-            </CardTitle>
-            <CardActions>
-              <ActionButton onClick={() => handleRefresh('Single-Line Diagram')}>
-                <FiRefreshCw />
-              </ActionButton>
-              <ActionButton onClick={() => handleDownload('Single-Line Diagram')}>
-                <FiDownload />
-              </ActionButton>
-              <ActionButton onClick={() => handleFullscreen('Single-Line Diagram')}>
-                <FiMaximize2 />
-              </ActionButton>
-            </CardActions>
-          </CardHeader>
-          <VisualizationPlaceholder>
-            <PlaceholderIcon>📐</PlaceholderIcon>
-            <PlaceholderText>Single-Line Diagram</PlaceholderText>
-            <PlaceholderSubtext>IEEE-standard electrical schematic with professional symbols</PlaceholderSubtext>
-          </VisualizationPlaceholder>
-        </VisualizationCard>
+      <TabButtons>
+        <TabButton
+          active={viewMode === '2D'}
+          onClick={() => setViewMode('2D')}
+        >
+          <FiGrid />
+          2D Single-Line Diagram
+        </TabButton>
+        <TabButton
+          active={viewMode === '3D'}
+          onClick={() => setViewMode('3D')}
+        >
+          <FiCpu />
+          3D Substation Model
+        </TabButton>
+      </TabButtons>
 
-        <VisualizationCard>
-          <CardHeader>
-            <CardTitle>
-              <FiMonitor />
-              Power Flow Analysis
-            </CardTitle>
-            <CardActions>
-              <ActionButton onClick={() => handleRefresh('Power Flow')}>
-                <FiRefreshCw />
-              </ActionButton>
-              <ActionButton onClick={() => handleDownload('Power Flow')}>
-                <FiDownload />
-              </ActionButton>
-              <ActionButton onClick={() => handleFullscreen('Power Flow')}>
-                <FiMaximize2 />
-              </ActionButton>
-            </CardActions>
-          </CardHeader>
-          <VisualizationPlaceholder>
-            <PlaceholderIcon>⚡</PlaceholderIcon>
-            <PlaceholderText>Power Flow Analysis</PlaceholderText>
-            <PlaceholderSubtext>Real-time power flow visualization with load distribution</PlaceholderSubtext>
-          </VisualizationPlaceholder>
-        </VisualizationCard>
-
-        <VisualizationCard>
-          <CardHeader>
-            <CardTitle>
-              <FiMonitor />
-              Voltage Profile
-            </CardTitle>
-            <CardActions>
-              <ActionButton onClick={() => handleRefresh('Voltage Profile')}>
-                <FiRefreshCw />
-              </ActionButton>
-              <ActionButton onClick={() => handleDownload('Voltage Profile')}>
-                <FiDownload />
-              </ActionButton>
-              <ActionButton onClick={() => handleFullscreen('Voltage Profile')}>
-                <FiMaximize2 />
-              </ActionButton>
-            </CardActions>
-          </CardHeader>
-          <VisualizationPlaceholder>
-            <PlaceholderIcon>📈</PlaceholderIcon>
-            <PlaceholderText>Voltage Profile</PlaceholderText>
-            <PlaceholderSubtext>Voltage analysis and unbalance detection across all buses</PlaceholderSubtext>
-          </VisualizationPlaceholder>
-        </VisualizationCard>
-      </VisualizationGrid>
-
-      <FullWidthCard>
-        <CardHeader>
-          <CardTitle>
-            <FiMonitor />
-            3D Substation Model
-          </CardTitle>
-          <CardActions>
-            <ActionButton onClick={() => handleRefresh('3D Model')}>
-              <FiRefreshCw />
-            </ActionButton>
-            <ActionButton onClick={() => handleDownload('3D Model')}>
-              <FiDownload />
-            </ActionButton>
-            <ActionButton onClick={() => handleFullscreen('3D Model')}>
-              <FiMaximize2 />
-            </ActionButton>
-          </CardActions>
-        </CardHeader>
-        <VisualizationPlaceholder style={{ height: '400px' }}>
-          <PlaceholderIcon>🏭</PlaceholderIcon>
-          <PlaceholderText>3D Substation Model</PlaceholderText>
-          <PlaceholderSubtext>Interactive 3D visualization of the Indian EHV substation with real-time data overlay</PlaceholderSubtext>
-        </VisualizationPlaceholder>
-      </FullWidthCard>
+      <VisualizationWrapper>
+        {viewMode === '2D' ? (
+          <SubstationVisualization2D />
+        ) : (
+          <SubstationVisualization3D />
+        )}
+      </VisualizationWrapper>
     </VisualizationContainer>
   );
 };

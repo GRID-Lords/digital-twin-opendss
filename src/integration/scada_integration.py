@@ -12,9 +12,17 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import pandas as pd
 import numpy as np
-import pymodbus
-from pymodbus.client.sync import ModbusTcpClient
-from pymodbus.payload import BinaryPayloadDecoder, BinaryPayloadBuilder
+try:
+    # Try pymodbus 3.x
+    from pymodbus.client import ModbusTcpClient
+except ImportError:
+    try:
+        # Fall back to pymodbus 2.x
+        from pymodbus.client.sync import ModbusTcpClient
+    except ImportError:
+        # Pymodbus not available, will use simulated data
+        ModbusTcpClient = None
+        pass
 import sqlite3
 import requests
 from dataclasses import dataclass
