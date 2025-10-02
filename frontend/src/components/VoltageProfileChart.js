@@ -105,16 +105,16 @@ const VoltageProfileChart = ({ assets }) => {
             fontSize={12}
             label={{ value: 'Voltage (kV)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8' } }}
           />
-          <Tooltip content={<CustomTooltip />} />
-          <Bar 
-            dataKey="voltage" 
+          <Tooltip content={<CustomTooltip />} cursor={false} />
+          <Bar
+            dataKey="voltage"
             fill="#4ade80"
             radius={[4, 4, 0, 0]}
           >
             {voltageData.map((entry, index) => (
-              <Bar 
-                key={`cell-${index}`} 
-                fill={getBarColor(entry.status)} 
+              <Bar
+                key={`cell-${index}`}
+                fill={getBarColor(entry.status)}
               />
             ))}
           </Bar>

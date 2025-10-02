@@ -63,10 +63,56 @@ async def get_power_flow_history(
 ):
     """Get historical power flow data for charts"""
 
-    end_time = datetime.now()
+    # Use IST timezone (UTC+5:30)
+    from datetime import timezone
+    IST = timezone(timedelta(hours=5, minutes=30))
+
+    end_time = datetime.now(IST)
     start_time = end_time - timedelta(hours=hours)
 
-    # Generate time series based on resolution
+    # Try to get data from database first
+    try:
+        from timeseries_db import timeseries_db
+        db_data = timeseries_db.get_power_flow_history(
+            start_time.replace(tzinfo=None),  # Remove timezone for DB query
+            end_time.replace(tzinfo=None)
+        )
+
+        if db_data and len(db_data) > 0:
+            # Use database data and format for frontend
+            data_points = []
+            for record in db_data:
+                # Parse timestamp and add IST timezone
+                ts = datetime.fromisoformat(str(record['timestamp']))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=IST)
+
+                data_points.append({
+                    "timestamp": ts.isoformat(),
+                    "activePower": round(record.get('active_power', 0), 2),
+                    "reactivePower": round(record.get('reactive_power', 0), 2),
+                    "apparentPower": round(record.get('apparent_power', 0), 2),
+                    "powerFactor": round(record.get('power_factor', 0.95), 3)
+                })
+
+            logger.info(f"Returning {len(data_points)} power flow records from database")
+
+            return {
+                "start": start_time.isoformat(),
+                "end": end_time.isoformat(),
+                "resolution": resolution,
+                "data": data_points,
+                "summary": {
+                    "avgActivePower": round(np.mean([d["activePower"] for d in data_points]), 2) if data_points else 0,
+                    "maxActivePower": round(max((d["activePower"] for d in data_points), default=0), 2),
+                    "minActivePower": round(min((d["activePower"] for d in data_points), default=0), 2),
+                    "totalEnergy": round(sum(d["activePower"] for d in data_points) * 1, 2)  # MWh (approximate)
+                }
+            }
+    except Exception as e:
+        logger.warning(f"Failed to fetch from database, generating fallback data: {e}")
+
+    # Fallback: Generate time series based on resolution with IST timestamps
     timestamps = []
     current = start_time
 
@@ -85,7 +131,7 @@ async def get_power_flow_history(
     for i, ts in enumerate(timestamps):
         hour = ts.hour
 
-        # Create daily load pattern (low at night, peaks at 10am and 7pm)
+        # Create daily load pattern (low at night, peaks at 10am and 7pm) - IST hours
         base_load = 250  # MW
 
         # Morning ramp (6am - 10am)
@@ -119,6 +165,8 @@ async def get_power_flow_history(
             "apparentPower": round(apparent_power, 2),
             "powerFactor": round(power_factor, 3)
         })
+
+    logger.info(f"Returning {len(data_points)} generated power flow records (fallback)")
 
     return {
         "start": start_time.isoformat(),
