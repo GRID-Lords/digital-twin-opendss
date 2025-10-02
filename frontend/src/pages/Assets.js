@@ -186,19 +186,20 @@ const Assets = () => {
 
   const getAvailableActions = (asset) => {
     const actions = [];
-    
-    if (asset.asset_type === 'CircuitBreaker') {
-      if (asset.status === 'healthy') {
+    const assetType = asset.type || asset.asset_type;
+
+    if (assetType === 'circuit_breaker' || assetType === 'CircuitBreaker') {
+      if (asset.status === 'operational' || asset.status === 'healthy') {
         actions.push({ action: 'open', label: 'Open', variant: 'danger' });
       } else {
         actions.push({ action: 'close', label: 'Close', variant: 'default' });
       }
     }
-    
+
     if (asset.status === 'fault') {
       actions.push({ action: 'reset', label: 'Reset', variant: 'default' });
     }
-    
+
     return actions;
   };
 
@@ -234,27 +235,21 @@ const Assets = () => {
             </AssetHeader>
 
             <AssetMetrics>
-              {asset.parameters?.voltage && (
-                <Metric>
-                  <MetricLabel>Voltage</MetricLabel>
-                  <MetricValue>{asset.parameters.voltage}</MetricValue>
-                </Metric>
-              )}
-              {asset.parameters?.rating && (
-                <Metric>
-                  <MetricLabel>Rating</MetricLabel>
-                  <MetricValue>{asset.parameters.rating}</MetricValue>
-                </Metric>
-              )}
-              {asset.power !== undefined && (
-                <Metric>
-                  <MetricLabel>Power</MetricLabel>
-                  <MetricValue>{asset.power?.toFixed(1) || 0} kW</MetricValue>
-                </Metric>
-              )}
+              <Metric>
+                <MetricLabel>Voltage</MetricLabel>
+                <MetricValue>{asset.parameters?.voltage || 'N/A'}</MetricValue>
+              </Metric>
+              <Metric>
+                <MetricLabel>Rating</MetricLabel>
+                <MetricValue>{asset.parameters?.rating || 'N/A'}</MetricValue>
+              </Metric>
+              <Metric>
+                <MetricLabel>Temperature</MetricLabel>
+                <MetricValue>{asset.parameters?.temperature || 'N/A'}</MetricValue>
+              </Metric>
               <Metric>
                 <MetricLabel>Health</MetricLabel>
-                <MetricValue>{asset.health?.toFixed(1) || asset.health_score?.toFixed(1) || 0}%</MetricValue>
+                <MetricValue>{typeof asset.health === 'number' ? asset.health.toFixed(1) : '0'}%</MetricValue>
               </Metric>
             </AssetMetrics>
 

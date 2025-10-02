@@ -84,7 +84,7 @@ export const DigitalTwinProvider = ({ children }) => {
     try {
       setLoading(true);
       const response = await axios.get('/api/assets');
-      setAssets(response.data);
+      setAssets(response.data.assets || response.data);
     } catch (error) {
       setError('Failed to fetch assets');
       toast.error('Failed to fetch assets');
