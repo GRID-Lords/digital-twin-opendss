@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 import { FiMonitor, FiDownload, FiRefreshCw, FiMaximize2, FiCpu, FiGrid } from 'react-icons/fi';
 import toast from 'react-hot-toast';
@@ -116,19 +116,100 @@ const Visualization = () => {
   const [viewMode, setViewMode] = useState('2D');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [systemMetrics, setSystemMetrics] = useState({
-    totalLoad: 330,
-    systemHealth: 92,
-    activeAlarms: 2,
-    onlineAssets: 45
+    totalLoad: 0,
+    systemHealth: 0,
+    activeAlarms: 0,
+    onlineAssets: 0
   });
+  const [activeAnomalies, setActiveAnomalies] = useState({});
+  const visualizationRef = useRef(null);
+
+  // Fetch real metrics on mount and periodically
+  React.useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const [metricsRes, assetsRes, alertsRes] = await Promise.all([
+          fetch('/api/metrics').then(r => r.json()),
+          fetch('/api/assets').then(r => r.json()),
+          fetch('/api/alerts?limit=100').then(r => r.json())
+        ]);
+
+        const assets = assetsRes.assets || assetsRes;
+        const operationalAssets = Object.values(assets).filter(a => a.status === 'operational' || a.status?.toLowerCase() === 'operational').length;
+
+        setSystemMetrics({
+          totalLoad: Math.round((metricsRes.total_load || metricsRes.total_power || 0) * 100) / 100, // Already in MW, round to 2 decimals
+          systemHealth: Math.round((metricsRes.system_health || metricsRes.efficiency || 0) * 100) / 100, // Round to 2 decimals
+          activeAlarms: alertsRes.unresolved_count || alertsRes.alerts?.filter(a => !a.resolved).length || 0,
+          onlineAssets: operationalAssets
+        });
+      } catch (error) {
+        console.error('Error fetching metrics:', error);
+      }
+    };
+
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for fullscreen changes
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+      setIsFullscreen(isCurrentlyFullscreen);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   const handleFullscreen = () => {
-    if (!isFullscreen) {
-      document.documentElement.requestFullscreen();
+    const isCurrentlyFullscreen = !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+
+    if (!isCurrentlyFullscreen) {
+      if (visualizationRef.current) {
+        if (visualizationRef.current.requestFullscreen) {
+          visualizationRef.current.requestFullscreen();
+        } else if (visualizationRef.current.webkitRequestFullscreen) {
+          visualizationRef.current.webkitRequestFullscreen();
+        } else if (visualizationRef.current.mozRequestFullScreen) {
+          visualizationRef.current.mozRequestFullScreen();
+        } else if (visualizationRef.current.msRequestFullscreen) {
+          visualizationRef.current.msRequestFullscreen();
+        }
+      }
     } else {
-      document.exitFullscreen();
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
     }
-    setIsFullscreen(!isFullscreen);
   };
 
   const handleExport = () => {
@@ -141,15 +222,20 @@ const Visualization = () => {
     toast.loading('Refreshing data...', { id: 'refresh' });
 
     try {
-      // Fetch latest metrics from API
-      const response = await fetch('/api/metrics');
-      const data = await response.json();
+      const [metricsRes, assetsRes, alertsRes] = await Promise.all([
+        fetch('/api/metrics').then(r => r.json()),
+        fetch('/api/assets').then(r => r.json()),
+        fetch('/api/alerts?limit=100').then(r => r.json())
+      ]);
+
+      const assets = assetsRes.assets || assetsRes;
+      const operationalAssets = Object.values(assets).filter(a => a.status === 'operational' || a.status?.toLowerCase() === 'operational').length;
 
       setSystemMetrics({
-        totalLoad: data.total_load || 330,
-        systemHealth: data.system_health || 92,
-        activeAlarms: data.alerts?.length || 0,
-        onlineAssets: data.operational_assets || 45
+        totalLoad: Math.round((metricsRes.total_load || metricsRes.total_power || 0) * 100) / 100, // Already in MW, round to 2 decimals
+        systemHealth: Math.round((metricsRes.system_health || metricsRes.efficiency || 0) * 100) / 100, // Round to 2 decimals
+        activeAlarms: alertsRes.unresolved_count || alertsRes.alerts?.filter(a => !a.resolved).length || 0,
+        onlineAssets: operationalAssets
       });
 
       toast.success('Data refreshed!', { id: 'refresh' });
@@ -163,17 +249,14 @@ const Visualization = () => {
       <PageHeader>
         <Title>Substation Visualization & Control</Title>
         <ControlButtons>
-          <ControlButton onClick={handleRefresh}>
+          <ControlButton onClick={handleRefresh} title="Refresh">
             <FiRefreshCw />
-            Refresh
           </ControlButton>
-          <ControlButton onClick={handleExport}>
+          <ControlButton onClick={handleExport} title="Export">
             <FiDownload />
-            Export
           </ControlButton>
-          <ControlButton onClick={handleFullscreen}>
+          <ControlButton onClick={handleFullscreen} title="Fullscreen">
             <FiMaximize2 />
-            Fullscreen
           </ControlButton>
         </ControlButtons>
       </PageHeader>
@@ -214,15 +297,15 @@ const Visualization = () => {
         </TabButton>
       </TabButtons>
 
-      <VisualizationWrapper>
+      <VisualizationWrapper ref={visualizationRef}>
         {viewMode === '2D' ? (
-          <SubstationVisualization2D />
+          <SubstationVisualization2D activeAnomalies={activeAnomalies} />
         ) : (
-          <SubstationVisualization3D />
+          <SubstationVisualization3D activeAnomalies={activeAnomalies} />
         )}
       </VisualizationWrapper>
 
-      <AnomalySimulationPanel />
+      <AnomalySimulationPanel onAnomalyChange={setActiveAnomalies} />
     </VisualizationContainer>
   );
 };

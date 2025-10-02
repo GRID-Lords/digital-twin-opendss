@@ -26,8 +26,10 @@ logger = logging.getLogger(__name__)
 # Initialize router
 router = APIRouter(prefix="/api/simulation", tags=["simulation"])
 
-# Global simulator instance
+# Global simulator instance and active anomaly tracking
 anomaly_simulator = None
+active_anomaly = None
+active_anomaly_task = None
 
 def get_simulator():
     """Get or create anomaly simulator instance"""
@@ -84,7 +86,16 @@ async def trigger_anomaly(request: AnomalyRequest):
     - capacitor_failure, capacitor_switching
     - frequency_deviation, power_oscillation
     """
+    global active_anomaly, active_anomaly_task
+
     try:
+        # Check if another anomaly is currently active
+        if active_anomaly is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Another anomaly '{active_anomaly['type']}' is currently active. Please wait for it to complete or stop it first."
+            )
+
         simulator = get_simulator()
 
         # Map frontend anomaly types to simulator methods
@@ -144,6 +155,49 @@ async def trigger_anomaly(request: AnomalyRequest):
 
         # Generate visualization data for frontend
         viz_data = generate_visualization_data(result, request.type)
+
+        # === AI/ML PREDICTION & ALERT INTEGRATION ===
+        # Trigger AI/ML analysis and store alert when anomaly occurs
+        try:
+            # Import alert service and AI insights service
+            from src.monitoring.alert_service import alert_service
+            from src.monitoring.ai_insights_service import ai_insights_service
+
+            # Create anomaly alert description
+            description = f"{request.type.replace('_', ' ').title()} detected at {request.location} with {request.severity} severity"
+
+            # Trigger anomaly alert
+            alert = await alert_service.trigger_anomaly_alert(
+                anomaly_type=request.type,
+                asset_id=request.location,
+                description=description,
+                severity=request.severity
+            )
+
+            # Generate AI insights for this anomaly
+            asset_data = {
+                'location': request.location,
+                'anomaly_type': request.type,
+                'severity': request.severity,
+                'impact': impact
+            }
+            metrics = {
+                'voltage_deviation': impact.get('voltage_deviation', 0),
+                'power_loss': impact.get('power_loss', 0),
+                'severity_score': impact.get('severity_score', 0)
+            }
+
+            ai_insight = await ai_insights_service.generate_asset_insight(
+                request.location,
+                asset_data,
+                metrics
+            )
+
+            logger.info(f"AI/ML analysis completed for anomaly: {anomaly_id}, Alert ID: {alert.get('id') if alert else 'None'}")
+
+        except Exception as ai_error:
+            logger.warning(f"AI/ML analysis failed for anomaly {anomaly_id}: {ai_error}")
+            # Continue even if AI/ML fails
 
         # Schedule auto-clear after duration
         asyncio.create_task(clear_anomaly_after_delay(

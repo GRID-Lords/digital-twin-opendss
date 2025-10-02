@@ -181,12 +181,12 @@ const AnomalySimulationPanel = () => {
   const [runningScenarios, setRunningScenarios] = useState({});
   const [statusMessage, setStatusMessage] = useState(null);
   const [scenarioParams, setScenarioParams] = useState({
-    voltage_sag: { severity: 0.8, duration: 5, location: 'Bus220_1' },
-    voltage_surge: { severity: 1.15, duration: 3, location: 'Bus400_1' },
-    overload: { load_factor: 1.5, transformer: 'TR1', duration: 10 },
-    ground_fault: { resistance: 10, location: 'Line220_1', duration: 0.1 },
-    harmonics: { thd: 8, order: 5, source: 'CAP1' },
-    frequency_deviation: { deviation: 0.5, duration: 2, type: 'under' }
+    voltage_sag: { severity: 0.85, duration: 3, location: 'Bus400_1' },
+    voltage_surge: { severity: 1.12, duration: 2, location: 'Bus220_1' },
+    overload: { load_factor: 1.2, transformer: 'TR1', duration: 15 },
+    ground_fault: { resistance: 5, location: 'Line400_1', duration: 3 },
+    harmonics: { thd: 5, order: 5, source: 'CAP1' },
+    frequency_deviation: { deviation: 0.3, duration: 5, type: 'under' }
   });
 
   const scenarios = [
