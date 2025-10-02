@@ -30,8 +30,8 @@ const PowerFlowChart = ({ metrics = {} }) => {
 
         const formattedData = historicalData.map(point => ({
           time: new Date(point.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          power: point.active_power || 0,
-          efficiency: ((point.active_power / (point.apparent_power || 1)) * 100) || 95
+          power: point.activePower || 0,
+          efficiency: ((point.activePower / (point.apparentPower || 1)) * 100) || 95
         }));
 
         setData(formattedData);
