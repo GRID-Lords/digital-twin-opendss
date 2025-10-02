@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import axios from 'axios';
 
 const ChartContainer = styled.div`
   background: #1e293b;
@@ -19,31 +20,53 @@ const ChartTitle = styled.h3`
 `;
 
 const PowerFlowChart = ({ metrics = {} }) => {
-  // Generate sample data for the last 24 hours
-  const generatePowerData = () => {
-    const data = [];
-    const now = new Date();
+  const [data, setData] = useState([]);
 
-    for (let i = 23; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * 60 * 60 * 1000);
-      const hour = time.getHours();
+  useEffect(() => {
+    const fetchHistoricalData = async () => {
+      try {
+        const response = await axios.get('/api/historical/power-flow?hours=24');
+        const historicalData = response.data.data || [];
 
-      // Simulate daily load pattern
-      const baseLoad = metrics?.total_power || 100;
-      const loadFactor = 0.6 + 0.4 * Math.sin(2 * Math.PI * hour / 24);
-      const power = baseLoad * loadFactor + (Math.random() - 0.5) * 10;
+        const formattedData = historicalData.map(point => ({
+          time: new Date(point.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          power: point.active_power || 0,
+          efficiency: ((point.active_power / (point.apparent_power || 1)) * 100) || 95
+        }));
 
-      data.push({
-        time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        power: Math.max(0, power),
-        efficiency: (metrics?.efficiency || 95) + (Math.random() - 0.5) * 2
-      });
-    }
+        setData(formattedData);
+      } catch (error) {
+        console.error('Error fetching power flow data:', error);
+        // Fallback to generated data
+        setData(generateFallbackData());
+      }
+    };
 
-    return data;
-  };
+    const generateFallbackData = () => {
+      const fallbackData = [];
+      const now = new Date();
 
-  const data = generatePowerData();
+      for (let i = 23; i >= 0; i--) {
+        const time = new Date(now.getTime() - i * 60 * 60 * 1000);
+        const hour = time.getHours();
+        const baseLoad = metrics?.total_power || 100;
+        const loadFactor = 0.6 + 0.4 * Math.sin(2 * Math.PI * hour / 24);
+        const power = baseLoad * loadFactor + (Math.random() - 0.5) * 10;
+
+        fallbackData.push({
+          time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          power: Math.max(0, power),
+          efficiency: (metrics?.efficiency || 95) + (Math.random() - 0.5) * 2
+        });
+      }
+      return fallbackData;
+    };
+
+    fetchHistoricalData();
+    const interval = setInterval(fetchHistoricalData, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [metrics]);
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {

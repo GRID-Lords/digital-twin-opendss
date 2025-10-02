@@ -117,9 +117,9 @@ const Dashboard = () => {
 
       <ChartsGrid>
         <AssetStatusChart assets={assets} />
-        <PowerFlowChart />
+        <PowerFlowChart metrics={metrics} />
         <FullWidthChart>
-          <VoltageProfileChart />
+          <VoltageProfileChart assets={assets} />
         </FullWidthChart>
       </ChartsGrid>
 
