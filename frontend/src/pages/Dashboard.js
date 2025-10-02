@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import { useDigitalTwin } from '../context/DigitalTwinContext';
 import MetricCard from '../components/MetricCard';
@@ -55,12 +55,9 @@ const FullWidthChart = styled.div`
 `;
 
 const Dashboard = () => {
-  const { metrics, assets, fetchMetrics, fetchAssets } = useDigitalTwin();
+  const { metrics, assets } = useDigitalTwin();
 
-  useEffect(() => {
-    fetchMetrics();
-    fetchAssets();
-  }, [fetchMetrics, fetchAssets]);
+  // No need to fetch on mount - DigitalTwinContext already handles auto-refresh
 
   const metricCards = [
     {

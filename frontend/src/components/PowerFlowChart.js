@@ -63,10 +63,14 @@ const PowerFlowChart = ({ metrics = {} }) => {
     };
 
     fetchHistoricalData();
-    const interval = setInterval(fetchHistoricalData, 30000); // Update every 30 seconds
+    // No interval needed - historical data is static for the last 24 hours
+    // Only fetch once on mount
+
+    // Optional: Refresh every 5 minutes to get latest hourly data
+    const interval = setInterval(fetchHistoricalData, 300000); // 5 minutes
 
     return () => clearInterval(interval);
-  }, [metrics]);
+  }, []); // Empty deps - only run on mount
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
