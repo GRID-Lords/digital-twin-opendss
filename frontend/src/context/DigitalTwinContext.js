@@ -215,6 +215,7 @@ export const DigitalTwinProvider = ({ children }) => {
       fetchAssets();
       fetchSCADAData();
       fetchAIAnalysis();
+      fetchIoTDevices();
       fetchCacheStats();
     };
 

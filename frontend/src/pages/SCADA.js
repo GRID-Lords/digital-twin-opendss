@@ -45,20 +45,19 @@ const SCADAGrid = styled.div`
 `;
 
 const SCADASection = styled.div`
-  background: #ffffff;
-  
-  border: 1px solid #e2e8f0;
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: 12px;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   padding: 1.5rem;
-  color: #0f172a;
+  color: #f1f5f9;
 `;
 
 const SectionTitle = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: #0f172a;
+  color: #f1f5f9;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -73,15 +72,16 @@ const DataPoint = styled.div`
   border-radius: 8px;
   margin-bottom: 0.5rem;
   transition: all 0.2s ease;
-  
+
   &:hover {
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
   }
 `;
 
 const DataPointName = styled.div`
   font-size: 0.9rem;
   font-weight: 500;
+  color: #e2e8f0;
 `;
 
 const DataPointValue = styled.div`
@@ -105,9 +105,9 @@ const IoTDevice = styled.div`
   border-radius: 8px;
   margin-bottom: 0.5rem;
   transition: all 0.2s ease;
-  
+
   &:hover {
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
   }
 `;
 
@@ -120,6 +120,7 @@ const DeviceInfo = styled.div`
 const DeviceName = styled.div`
   font-size: 0.9rem;
   font-weight: 500;
+  color: #e2e8f0;
 `;
 
 const DeviceType = styled.div`
@@ -148,6 +149,11 @@ const AlarmItem = styled.div`
   border-radius: 8px;
   margin-bottom: 0.5rem;
   border-left: 3px solid ${props => props.severity === 'high' ? '#ef4444' : '#f59e0b'};
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
 `;
 
 const AlarmIcon = styled.div`
@@ -163,6 +169,7 @@ const AlarmMessage = styled.div`
   font-size: 0.9rem;
   font-weight: 500;
   margin-bottom: 0.25rem;
+  color: #e2e8f0;
 `;
 
 const AlarmTime = styled.div`
@@ -175,8 +182,8 @@ const SCADA = () => {
 
   // No need to fetch on mount - DigitalTwinContext already handles auto-refresh
 
-  const scadaPoints = scadaData.scada_data || {};
-  const iotData = iotDevices || {};
+  const scadaPoints = scadaData?.data?.scada_data || {};
+  const iotData = iotDevices?.devices || [];
 
   // Sample alarms data
   const alarms = [
@@ -234,11 +241,11 @@ const SCADA = () => {
             <FiActivity />
             IoT Devices
           </SectionTitle>
-          {Object.entries(iotData).map(([deviceId, device]) => (
-            <IoTDevice key={deviceId}>
+          {iotData.map((device) => (
+            <IoTDevice key={device.id}>
               <DeviceInfo>
-                <DeviceName>{deviceId}</DeviceName>
-                <DeviceType>{device.device_type}</DeviceType>
+                <DeviceName>{device.name}</DeviceName>
+                <DeviceType>{device.type}</DeviceType>
               </DeviceInfo>
               <DeviceStatus status={device.status}>
                 <FiCheckCircle />

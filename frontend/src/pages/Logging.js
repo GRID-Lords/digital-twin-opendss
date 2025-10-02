@@ -261,16 +261,16 @@ const Logging = () => {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/historical/system-events', {
+      const response = await axios.get('/api/alerts', {
         params: {
-          days: filters.days,
-          event_type: filters.eventType || undefined
+          limit: 100,
+          unresolved_only: filters.eventType === 'unresolved'
         }
       });
-      setLogs(response.data.events || []);
+      setLogs(response.data.alerts || []);
     } catch (error) {
-      toast.error('Failed to fetch logs');
-      console.error('Error fetching logs:', error);
+      toast.error('Failed to fetch alerts');
+      console.error('Error fetching alerts:', error);
     } finally {
       setLoading(false);
     }
