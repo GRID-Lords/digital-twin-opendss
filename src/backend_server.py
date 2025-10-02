@@ -36,7 +36,9 @@ from src.visualization.circuit_visualizer import OpenDSSVisualizer as CircuitVis
 from src.api.anomaly_endpoints import router as anomaly_router
 from src.api.asset_endpoints import router as asset_router
 from src.api.historical_endpoints import router as historical_router
+from src.api.alerts_endpoints import router as alerts_router
 from src.database import db  # Import database module
+from src.monitoring import alert_service, ai_insights_service
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +55,7 @@ app = FastAPI(
 app.include_router(anomaly_router)
 app.include_router(asset_router)
 app.include_router(historical_router)
+app.include_router(alerts_router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -111,6 +114,10 @@ async def startup_event():
         from src.api.historical_endpoints import set_managers
         set_managers(data_manager, asset_manager)
 
+        # Set services in alerts endpoints
+        from src.api.alerts_endpoints import set_services
+        set_services(alert_service, ai_insights_service, asset_manager)
+
         # Initialize SCADA
         scada_config = {
             "modbus_host": "localhost",
@@ -141,6 +148,10 @@ async def startup_event():
 
         logger.info("AI/ML models initialized")
 
+        # Initialize AI Insights Service with AI Manager
+        ai_insights_service.ai_manager = ai_manager
+        logger.info("AI Insights Service initialized")
+
         # Initialize Real-time Monitor
         monitor = RealTimeMonitor()
         logger.info("Real-time monitor initialized")
@@ -157,6 +168,7 @@ async def startup_event():
         asyncio.create_task(real_time_data_generator())
         asyncio.create_task(websocket_broadcaster())
         asyncio.create_task(asset_data_updater())  # Add asset updater task
+        asyncio.create_task(alert_monitoring_loop())  # Add alert monitoring
 
         logger.info("Digital Twin Backend started successfully")
 
@@ -309,6 +321,48 @@ async def websocket_broadcaster():
         except Exception as e:
             logger.error(f"Error in websocket broadcaster: {e}")
             await asyncio.sleep(5)
+
+async def alert_monitoring_loop():
+    """Monitor assets and generate alerts"""
+    while True:
+        try:
+            if asset_manager and alert_service:
+                # Get all assets
+                assets_dict = {}
+                for asset_id in asset_manager.assets:
+                    asset = asset_manager.get_asset(asset_id)
+                    if asset:
+                        # Convert asset to dict format expected by alert service
+                        assets_dict[asset_id] = {
+                            'name': asset.name,
+                            'status': asset.status,
+                            'health': asset.health_score,
+                            'parameters': asset.__dict__.get('real_time_data', {})
+                        }
+
+                # Monitor and generate alerts
+                alerts_generated = await alert_service.monitor_assets(assets_dict)
+
+                if alerts_generated:
+                    logger.info(f"Generated {len(alerts_generated)} new alerts")
+
+                # Periodically run AI analysis (every 5 minutes)
+                if not hasattr(alert_monitoring_loop, '_last_ai_analysis'):
+                    alert_monitoring_loop._last_ai_analysis = 0
+
+                current_time = time.time()
+                if current_time - alert_monitoring_loop._last_ai_analysis >= 300:  # 5 minutes
+                    if ai_insights_service:
+                        metrics = await get_current_metrics()
+                        await ai_insights_service.analyze_system_health(assets_dict, metrics)
+                        alert_monitoring_loop._last_ai_analysis = current_time
+                        logger.info("AI system health analysis completed")
+
+            await asyncio.sleep(60)  # Check every 60 seconds
+
+        except Exception as e:
+            logger.error(f"Error in alert monitoring loop: {e}")
+            await asyncio.sleep(60)
 
 async def get_current_metrics():
     """Get current system metrics with optimized storage"""
