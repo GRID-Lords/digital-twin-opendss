@@ -1,0 +1,238 @@
+! Indian EHV 400/220 kV Substation Digital Twin Model
+! Based on typical Indian power grid configuration
+! Developed for Digital Twin simulation
+
+Clear
+
+! ============================================================================
+! 1. SUBSTATION CONFIGURATION - INDIAN EHV STANDARDS
+! ============================================================================
+New Circuit.IndianEHVSubstation phases=3 BasekV=400 pu=1.00 angle=0
+~ bus1=GridBus400kV 
+~ ISC3=50000 ISC1=45000             ! Indian grid short circuit strength
+
+! Set Indian voltage bases
+Set VoltageBases=[400 220 132 33 11 0.415]
+
+! ============================================================================
+! 2. TRANSMISSION SYSTEM - 400 kV GRID CONNECTION
+! ============================================================================
+! Main grid connection (400 kV)
+New Vsource.GridSource phases=3
+~ Bus1=GridBus400kV.1.2.3.0
+~ BasekV=400
+~ pu=1.0
+~ angle=0
+~ ISC3=50000 ISC1=45000
+
+! 400 kV Bus Sectionalizer
+New Line.BusSectionalizer400kV phases=3
+~ Bus1=GridBus400kV.1.2.3.0 Bus2=Bus400kV_1.1.2.3.0
+~ R1=0.001 X1=0.002 R0=0.003 X0=0.006
+~ Length=0.1 Units=km
+
+! ============================================================================
+! 3. MAIN POWER TRANSFORMERS - 400/220 kV
+! ============================================================================
+! Transformer 1 (400/220 kV, 315 MVA)
+New Transformer.TX1_400_220 phases=3 windings=2
+~ Buses=(Bus400kV_1.1.2.3.0 Bus220kV_1.1.2.3.0)
+~ Conns=(Delta Wye)
+~ KVs=(400 220)
+~ KVAs=(315000 315000)
+~ XHL=12
+~ %R=0.3
+~ %LoadLoss=0.4
+~ %NoLoadLoss=0.1
+
+! Transformer 2 (400/220 kV, 315 MVA) - Redundancy
+New Transformer.TX2_400_220 phases=3 windings=2
+~ Buses=(Bus400kV_1.1.2.3.0 Bus220kV_2.1.2.3.0)
+~ Conns=(Delta Wye)
+~ KVs=(400 220)
+~ KVAs=(315000 315000)
+~ XHL=12
+~ %R=0.3
+~ %LoadLoss=0.4
+~ %NoLoadLoss=0.1
+
+! ============================================================================
+! 4. 220 kV DISTRIBUTION SYSTEM
+! ============================================================================
+! 220 kV Bus Coupler
+New Line.BusCoupler220kV phases=3
+~ Bus1=Bus220kV_1.1.2.3.0 Bus2=Bus220kV_2.1.2.3.0
+~ R1=0.002 X1=0.004 R0=0.006 X0=0.012
+~ Length=0.2 Units=km
+
+! 220 kV Feeders
+New Line.Feeder220kV_1 phases=3
+~ Bus1=Bus220kV_1.1.2.3.0 Bus2=LoadBus220kV_1.1.2.3.0
+~ R1=0.005 X1=0.01 R0=0.015 X0=0.03
+~ Length=5.0 Units=km
+
+New Line.Feeder220kV_2 phases=3
+~ Bus1=Bus220kV_2.1.2.3.0 Bus2=LoadBus220kV_2.1.2.3.0
+~ R1=0.005 X1=0.01 R0=0.015 X0=0.03
+~ Length=4.5 Units=km
+
+! ============================================================================
+! 5. DISTRIBUTION TRANSFORMERS - 220/33 kV
+! ============================================================================
+! Distribution Transformer 1 (220/33 kV, 50 MVA)
+New Transformer.DTX1_220_33 phases=3 windings=2
+~ Buses=(LoadBus220kV_1.1.2.3.0 Bus33kV_1.1.2.3.0)
+~ Conns=(Delta Wye)
+~ KVs=(220 33)
+~ KVAs=(50000 50000)
+~ XHL=8
+~ %R=0.5
+~ %LoadLoss=0.6
+~ %NoLoadLoss=0.2
+
+! Distribution Transformer 2 (220/33 kV, 50 MVA)
+New Transformer.DTX2_220_33 phases=3 windings=2
+~ Buses=(LoadBus220kV_2.1.2.3.0 Bus33kV_2.1.2.3.0)
+~ Conns=(Delta Wye)
+~ KVs=(220 33)
+~ KVAs=(50000 50000)
+~ XHL=8
+~ %R=0.5
+~ %LoadLoss=0.6
+~ %NoLoadLoss=0.2
+
+! ============================================================================
+! 6. 33 kV DISTRIBUTION SYSTEM
+! ============================================================================
+! 33 kV Feeders
+New Line.Feeder33kV_1 phases=3
+~ Bus1=Bus33kV_1.1.2.3.0 Bus2=LoadBus33kV_1.1.2.3.0
+~ R1=0.01 X1=0.02 R0=0.03 X0=0.06
+~ Length=10.0 Units=km
+
+New Line.Feeder33kV_2 phases=3
+~ Bus1=Bus33kV_2.1.2.3.0 Bus2=LoadBus33kV_2.1.2.3.0
+~ R1=0.01 X1=0.02 R0=0.03 X0=0.06
+~ Length=8.0 Units=km
+
+! ============================================================================
+! 7. LOADS - INDIAN POWER CONSUMPTION PATTERNS
+! ============================================================================
+! Industrial Loads (33 kV)
+New Load.IndustrialLoad1 phases=3
+~ Bus1=LoadBus33kV_1.1.2.3.0
+~ kV=33
+~ kW=15000 kvar=7500
+~ Model=1
+~ Class=3
+
+New Load.IndustrialLoad2 phases=3
+~ Bus1=LoadBus33kV_2.1.2.3.0
+~ kV=33
+~ kW=12000 kvar=6000
+~ Model=1
+~ Class=3
+
+! Commercial Loads (11 kV)
+New Load.CommercialLoad1 phases=3
+~ Bus1=LoadBus33kV_1.1.2.3.0
+~ kV=33
+~ kW=8000 kvar=4000
+~ Model=1
+~ Class=2
+
+New Load.CommercialLoad2 phases=3
+~ Bus1=LoadBus33kV_2.1.2.3.0
+~ kV=33
+~ kW=6000 kvar=3000
+~ Model=1
+~ Class=2
+
+! ============================================================================
+! 8. REACTIVE POWER COMPENSATION
+! ============================================================================
+! Shunt Reactors (400 kV)
+New Reactor.ShuntReactor400kV phases=3
+~ Bus1=Bus400kV_1.1.2.3.0
+~ kV=400
+~ kvar=50000
+
+! Shunt Reactors (220 kV)
+New Reactor.ShuntReactor220kV phases=3
+~ Bus1=Bus220kV_1.1.2.3.0
+~ kV=220
+~ kvar=30000
+
+! Capacitor Banks (33 kV)
+New Capacitor.CapBank33kV_1 phases=3
+~ Bus1=Bus33kV_1.1.2.3.0
+~ kV=33
+~ kvar=10000
+
+New Capacitor.CapBank33kV_2 phases=3
+~ Bus1=Bus33kV_2.1.2.3.0
+~ kV=33
+~ kvar=8000
+
+! ============================================================================
+! 9. PROTECTIVE DEVICES AND MONITORING
+! ============================================================================
+! Circuit Breakers (represented as switches)
+New Line.CB_400kV phases=3
+~ Bus1=GridBus400kV.1.2.3.0 Bus2=Bus400kV_1.1.2.3.0
+~ R1=0.0001 X1=0.0001 R0=0.0001 X0=0.0001
+~ Length=0.01 Units=km
+
+New Line.CB_220kV_1 phases=3
+~ Bus1=Bus220kV_1.1.2.3.0 Bus2=LoadBus220kV_1.1.2.3.0
+~ R1=0.0001 X1=0.0001 R0=0.0001 X0=0.0001
+~ Length=0.01 Units=km
+
+New Line.CB_220kV_2 phases=3
+~ Bus1=Bus220kV_2.1.2.3.0 Bus2=LoadBus220kV_2.1.2.3.0
+~ R1=0.0001 X1=0.0001 R0=0.0001 X0=0.0001
+~ Length=0.01 Units=km
+
+! ============================================================================
+! 10. ENERGY METERS AND MONITORS
+! ============================================================================
+! Energy Meters
+New EnergyMeter.GridMeter Element=Transformer.TX1_400_220 Terminal=1
+New EnergyMeter.DistMeter1 Element=Transformer.DTX1_220_33 Terminal=1
+New EnergyMeter.DistMeter2 Element=Transformer.DTX2_220_33 Terminal=1
+
+! Voltage Monitors
+New Monitor.VoltMonitor400kV Element=Vsource.GridSource Terminal=1 mode=0 ppolar=No
+New Monitor.VoltMonitor220kV_1 Element=Transformer.TX1_400_220 Terminal=2 mode=0 ppolar=No
+New Monitor.VoltMonitor220kV_2 Element=Transformer.TX2_400_220 Terminal=2 mode=0 ppolar=No
+New Monitor.VoltMonitor33kV_1 Element=Transformer.DTX1_220_33 Terminal=2 mode=0 ppolar=No
+New Monitor.VoltMonitor33kV_2 Element=Transformer.DTX2_220_33 Terminal=2 mode=0 ppolar=No
+
+! Current Monitors
+New Monitor.CurrentMonitor400kV Element=Transformer.TX1_400_220 Terminal=1 mode=1 ppolar=Yes
+New Monitor.CurrentMonitor220kV_1 Element=Transformer.TX1_400_220 Terminal=2 mode=1 ppolar=Yes
+New Monitor.CurrentMonitor220kV_2 Element=Transformer.TX2_400_220 Terminal=2 mode=1 ppolar=Yes
+
+! Power Monitors
+New Monitor.PowerMonitor400kV Element=Transformer.TX1_400_220 Terminal=1 mode=1 ppolar=No
+New Monitor.PowerMonitor220kV Element=Transformer.TX1_400_220 Terminal=2 mode=1 ppolar=No
+
+! ============================================================================
+! 11. FAULT ANALYSIS SETUP
+! ============================================================================
+! Fault impedance for short circuit analysis
+New Fault.Fault400kV phases=3
+~ Bus1=Bus400kV_1.1.2.3.0
+~ Bus2=Bus400kV_1.0.0.0
+~ ON=0
+
+New Fault.Fault220kV phases=3
+~ Bus1=Bus220kV_1.1.2.3.0
+~ Bus2=Bus220kV_1.0.0.0
+~ ON=0
+
+! ============================================================================
+! 12. SOLVE THE CIRCUIT
+! ============================================================================
+CalcVoltageBases
+Solve
