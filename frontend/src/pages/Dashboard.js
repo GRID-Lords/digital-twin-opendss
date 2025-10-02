@@ -2,47 +2,48 @@ import React from 'react';
 import styled from 'styled-components';
 import { useDigitalTwin } from '../context/DigitalTwinContext';
 import MetricCard from '../components/MetricCard';
+import AlertsTable from '../components/AlertsTable';
 import AssetStatusChart from '../components/AssetStatusChart';
 import PowerFlowChart from '../components/PowerFlowChart';
 import VoltageProfileChart from '../components/VoltageProfileChart';
-import RecentAlerts from '../components/RecentAlerts';
 
 const DashboardContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 `;
 
 const DashboardHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 `;
 
 const Title = styled.h1`
-  color: #f1f5f9;
-  font-size: 2rem;
-  font-weight: 700;
+  color: #0f172a;
+  font-size: 1.5rem;
+  font-weight: 600;
 `;
 
 const LastUpdated = styled.div`
-  color: #94a3b8;
-  font-size: 0.9rem;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 500;
 `;
 
 const MetricsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
 `;
 
 const ChartsGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin-bottom: 2rem;
+  gap: 1rem;
+  margin-bottom: 1rem;
 
   @media (max-width: 1200px) {
     grid-template-columns: 1fr;
@@ -111,6 +112,8 @@ const Dashboard = () => {
         ))}
       </MetricsGrid>
 
+      <AlertsTable />
+
       <ChartsGrid>
         <AssetStatusChart assets={assets} />
         <PowerFlowChart metrics={metrics} />
@@ -118,8 +121,6 @@ const Dashboard = () => {
           <VoltageProfileChart assets={assets} />
         </FullWidthChart>
       </ChartsGrid>
-
-      <RecentAlerts />
     </DashboardContainer>
   );
 };

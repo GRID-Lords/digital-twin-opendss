@@ -24,9 +24,9 @@ const GlobalStyle = createGlobalStyle`
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: #0f172a;
+    background: #f8fafc;
     min-height: 100vh;
-    color: #e2e8f0;
+    color: #0f172a;
   }
 
   @keyframes pulse {
@@ -38,7 +38,7 @@ const GlobalStyle = createGlobalStyle`
 const AppContainer = styled.div`
   display: flex;
   min-height: 100vh;
-  background: #0f172a;
+  background: #f8fafc;
 `;
 
 const MainContent = styled.div`
@@ -47,7 +47,7 @@ const MainContent = styled.div`
   flex-direction: column;
   margin-left: 250px;
   transition: margin-left 0.3s ease;
-  background: #1e293b;
+  background: #f8fafc;
 
   @media (max-width: 768px) {
     margin-left: 0;
@@ -55,19 +55,28 @@ const MainContent = styled.div`
 `;
 
 const Header = styled.header`
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
-  padding: 1rem 2rem;
+  position: fixed;
+  top: 0;
+  left: 250px;
+  right: 0;
+  z-index: 100;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.75rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+  @media (max-width: 768px) {
+    left: 0;
+  }
 `;
 
 const HeaderTitle = styled.h1`
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  color: #f1f5f9;
+  color: #0f172a;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -77,8 +86,9 @@ const StatusIndicator = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
-  color: #94a3b8;
+  font-size: 0.8125rem;
+  color: #64748b;
+  font-weight: 500;
 `;
 
 const StatusDot = styled.div`
@@ -91,13 +101,32 @@ const StatusDot = styled.div`
 
 const Content = styled.main`
   flex: 1;
-  padding: 2rem;
+  padding: 1.5rem;
+  padding-top: 5rem;
   overflow-y: auto;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
 `;
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState(false);
+
+  useEffect(() => {
+    // Handle responsive sidebar behavior
+    const handleResize = () => {
+      if (window.innerWidth > 768) {
+        setSidebarOpen(true);
+      }
+    };
+
+    // Set initial state
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     // Check connection status with reduced frequency
@@ -150,9 +179,11 @@ function App() {
             toastOptions={{
               duration: 4000,
               style: {
-                background: '#0f172a',
-                color: '#fff',
+                background: 'white',
+                color: '#0f172a',
                 borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
               },
             }}
           />
