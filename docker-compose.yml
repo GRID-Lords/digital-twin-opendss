@@ -1,0 +1,177 @@
+version: '3.8'
+
+services:
+  # PostgreSQL TimescaleDB for time-series data
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: digital-twin-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-digitaltwin}
+      POSTGRES_USER: ${DB_USER:-digitaltwin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepassword123}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - digital-twin-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-digitaltwin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and real-time data
+  redis:
+    image: redis:7-alpine
+    container_name: digital-twin-cache
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - digital-twin-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # InfluxDB for high-frequency metrics
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: digital-twin-metrics
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASSWORD:-securepassword123}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-digitaltwin}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET:-metrics}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:-my-super-secret-auth-token}
+    ports:
+      - "${INFLUX_PORT:-8086}:8086"
+    volumes:
+      - influx-data:/var/lib/influxdb2
+      - influx-config:/etc/influxdb2
+    networks:
+      - digital-twin-network
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: digital-twin-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-worldmap-panel
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - digital-twin-network
+    depends_on:
+      - timescaledb
+      - influxdb
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: digital-twin-backend
+    environment:
+      # Database Configuration
+      DB_TYPE: ${DB_TYPE:-postgresql}
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-digitaltwin}
+      DB_USER: ${DB_USER:-digitaltwin}
+      DB_PASSWORD: ${DB_PASSWORD:-securepassword123}
+
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # InfluxDB Configuration
+      INFLUX_HOST: influxdb
+      INFLUX_PORT: 8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-my-super-secret-auth-token}
+      INFLUX_ORG: ${INFLUX_ORG:-digitaltwin}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-metrics}
+
+      # Application Configuration
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Data Storage Strategy
+      REALTIME_CACHE_TTL: ${REALTIME_CACHE_TTL:-60}  # seconds
+      METRICS_STORAGE_INTERVAL: ${METRICS_STORAGE_INTERVAL:-3600}  # 1 hour in seconds
+      ANALYSIS_BATCH_SIZE: ${ANALYSIS_BATCH_SIZE:-100}
+
+      # SCADA Configuration
+      SCADA_ENABLED: ${SCADA_ENABLED:-true}
+      MODBUS_HOST: ${MODBUS_HOST:-localhost}
+      MODBUS_PORT: ${MODBUS_PORT:-502}
+
+      # AI/ML Configuration
+      ML_ENABLED: ${ML_ENABLED:-true}
+      ANOMALY_THRESHOLD: ${ANOMALY_THRESHOLD:-0.95}
+      PREDICTION_HORIZON: ${PREDICTION_HORIZON:-24}  # hours
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+      - ./models:/app/models
+    networks:
+      - digital-twin-network
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: digital-twin-frontend
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000}
+      REACT_APP_WS_URL: ${REACT_APP_WS_URL:-ws://localhost:8000/ws}
+      REACT_APP_GRAFANA_URL: ${REACT_APP_GRAFANA_URL:-http://localhost:3001}
+      DISABLE_ESLINT_PLUGIN: true
+      DANGEROUSLY_DISABLE_HOST_CHECK: true
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - digital-twin-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  digital-twin-network:
+    driver: bridge
+
+volumes:
+  timescale-data:
+  redis-data:
+  influx-data:
+  influx-config:
+  grafana-data:

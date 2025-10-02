@@ -1,1 +1,35 @@
-__pycache__/circuit_visualizer.cpython-313.pyc
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Visualization results
+visualization_results/
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Virtual environments
+opendss_env/
+venv/
+env/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+node_modules/
+
+frontend/node_modules/
+
+# AI/ML models (large binary files - retrain locally)
+models/
+*.pkl
