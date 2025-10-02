@@ -8,6 +8,7 @@ import Assets from './pages/Assets';
 import SCADA from './pages/SCADA';
 import Analytics from './pages/Analytics';
 import Visualization from './pages/Visualization';
+import Logging from './pages/Logging';
 import { DigitalTwinProvider } from './context/DigitalTwinContext';
 
 const GlobalStyle = createGlobalStyle`
@@ -140,6 +141,7 @@ function App() {
                 <Route path="/scada" element={<SCADA />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/visualization" element={<Visualization />} />
+                <Route path="/logging" element={<Logging />} />
               </Routes>
             </Content>
           </MainContent>
