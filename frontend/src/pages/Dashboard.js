@@ -6,7 +6,6 @@ import AssetStatusChart from '../components/AssetStatusChart';
 import PowerFlowChart from '../components/PowerFlowChart';
 import VoltageProfileChart from '../components/VoltageProfileChart';
 import RecentAlerts from '../components/RecentAlerts';
-import DataManagement from '../components/DataManagement';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -121,8 +120,6 @@ const Dashboard = () => {
       </ChartsGrid>
 
       <RecentAlerts />
-
-      <DataManagement />
     </DashboardContainer>
   );
 };
