@@ -961,6 +961,7 @@ async def get_ai_analysis():
     try:
         # Prepare current asset data for analysis
         current_data = {}
+        assets_dict = {}
         for asset_id, asset in asset_manager.assets.items():
             rt_data = asset.real_time_data
             voltage = rt_data.get('voltage_kv', asset.electrical.voltage_rating_kv)
@@ -976,13 +977,19 @@ async def get_ai_analysis():
                 'age_days': (datetime.now() - asset.commissioned_date).days
             }
 
-        # Get anomaly detection results
-        anomalies = ai_manager.anomaly_detector.detect_anomalies(current_data)
+            assets_dict[asset_id] = {
+                'name': asset.name,
+                'status': asset.status.value,
+                'health': asset.health.overall_health,
+                'parameters': {
+                    'voltage': voltage,
+                    'current': current,
+                    'temperature': asset.thermal.temperature_celsius,
+                    'power': voltage * current / 1000
+                }
+            }
 
-        # Get predictive maintenance results
-        predictions = ai_manager.predictive_model.predict_health_degradation(current_data)
-
-        # Get optimization recommendations
+        # Get metrics
         metrics = {
             'total_power': sum(d['power'] for d in current_data.values()),
             'frequency': 50.0,
@@ -990,14 +997,43 @@ async def get_ai_analysis():
             'efficiency': 96.8,
             'power_factor': 0.95
         }
-        optimization = ai_manager.optimizer.optimize_power_flow(metrics)
+
+        # Use the analyze_current_state method which combines all AI features
+        analysis_result = ai_manager.analyze_current_state(assets_dict, metrics)
+
+        # Get anomaly detection results (backup if analyze_current_state doesn't return anomalies)
+        anomalies = analysis_result.get('anomalies', [])
+        if not anomalies:
+            try:
+                anomalies = ai_manager.anomaly_detector.detect_anomalies(current_data)
+            except Exception as e:
+                logger.warning(f"Anomaly detection error: {e}")
+                anomalies = []
+
+        # Get predictive maintenance results (backup if not in analysis_result)
+        predictions = analysis_result.get('predictions', [])
+        if not predictions:
+            try:
+                predictions = ai_manager.predictive_model.predict_health_degradation(current_data)
+            except Exception as e:
+                logger.warning(f"Prediction error: {e}")
+                predictions = []
+
+        # Get optimization recommendations (backup if not in analysis_result)
+        optimization = analysis_result.get('optimization', {})
+        if not optimization:
+            try:
+                optimization = ai_manager.optimizer.optimize_power_flow(metrics)
+            except Exception as e:
+                logger.warning(f"Optimization error: {e}")
+                optimization = {}
 
         return {
             "timestamp": datetime.now().isoformat(),
             "anomalies": anomalies,
             "predictions": predictions,
             "optimization": optimization,
-            "model_confidence": 0.92
+            "model_confidence": analysis_result.get('model_confidence', 0.92)
         }
     except Exception as e:
         logger.error(f"AI analysis error: {e}")

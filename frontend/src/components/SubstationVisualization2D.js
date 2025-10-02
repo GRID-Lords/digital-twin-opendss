@@ -67,11 +67,12 @@ const SubstationVisualization2D = () => {
 
   useEffect(() => {
     drawComprehensiveSubstationDiagram();
-    fetchAssets();
+
+    // Update realtime data every 30 seconds (assets come from context)
     const interval = setInterval(() => {
       updateRealtimeData();
-      fetchAssets();
-    }, 10000);
+    }, 30000);
+
     return () => {
       clearInterval(interval);
       if (svgRef.current) {
@@ -80,15 +81,6 @@ const SubstationVisualization2D = () => {
       }
     };
   }, []);
-
-  const fetchAssets = async () => {
-    try {
-      const response = await axios.get('/api/assets');
-      setAssets(response.data);
-    } catch (error) {
-      console.error('Error fetching assets:', error);
-    }
-  };
 
   const drawComprehensiveSubstationDiagram = () => {
     const svg = d3.select(svgRef.current);
