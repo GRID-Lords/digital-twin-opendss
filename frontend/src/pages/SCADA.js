@@ -17,9 +17,9 @@ const PageHeader = styled.div`
 `;
 
 const Title = styled.h1`
-  color: #0f172a;
+  color: #f1f5f9;
   font-size: 2rem;
-  font-weight: 600;
+  font-weight: 700;
 `;
 
 const StatusIndicator = styled.div`
@@ -171,12 +171,9 @@ const AlarmTime = styled.div`
 `;
 
 const SCADA = () => {
-  const { scadaData, iotDevices, fetchSCADAData, fetchIoTDevices } = useDigitalTwin();
+  const { scadaData, iotDevices } = useDigitalTwin();
 
-  useEffect(() => {
-    fetchSCADAData();
-    fetchIoTDevices();
-  }, [fetchSCADAData, fetchIoTDevices]);
+  // No need to fetch on mount - DigitalTwinContext already handles auto-refresh
 
   const scadaPoints = scadaData.scada_data || {};
   const iotData = iotDevices || {};
@@ -206,7 +203,7 @@ const SCADA = () => {
   return (
     <SCADAContainer>
       <PageHeader>
-        <Title>📡 SCADA & IoT Monitoring</Title>
+        <Title>SCADA & IoT Monitoring</Title>
         <StatusIndicator>
           <FiCheckCircle />
           SCADA Connected
