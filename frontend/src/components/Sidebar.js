@@ -18,12 +18,12 @@ const SidebarContainer = styled.aside`
   left: 0;
   width: 250px;
   height: 100vh;
-  background: #1e293b;
-  border-right: 1px solid #334155;
+  background: white;
+  border-right: 1px solid #e2e8f0;
   transform: ${props => props.isOpen ? 'translateX(0)' : 'translateX(-100%)'};
   transition: transform 0.3s ease;
   z-index: 1000;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
   @media (max-width: 768px) {
     width: 100%;
@@ -32,17 +32,17 @@ const SidebarContainer = styled.aside`
 `;
 
 const SidebarHeader = styled.div`
-  padding: 1.5rem;
-  border-bottom: 1px solid #334155;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: space-between;
 `;
 
 const Logo = styled.div`
-  color: #f1f5f9;
-  font-size: 1.25rem;
-  font-weight: 700;
+  color: #0f172a;
+  font-size: 1.125rem;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -51,7 +51,7 @@ const Logo = styled.div`
 const ToggleButton = styled.button`
   background: none;
   border: none;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0.5rem;
@@ -59,8 +59,8 @@ const ToggleButton = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: #334155;
-    color: #f1f5f9;
+    background: #f1f5f9;
+    color: #0f172a;
   }
 
   @media (min-width: 769px) {
@@ -76,18 +76,19 @@ const NavItem = styled(Link)`
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1.5rem;
-  color: ${props => props.active ? '#f1f5f9' : '#94a3b8'};
+  padding: 0.625rem 1.25rem;
+  margin: 0 0.75rem;
+  color: ${props => props.active ? '#0f172a' : '#64748b'};
   text-decoration: none;
-  font-weight: ${props => props.active ? '600' : '400'};
+  font-weight: ${props => props.active ? '500' : '400'};
   font-size: 0.875rem;
-  background: ${props => props.active ? '#334155' : 'transparent'};
-  border-left: ${props => props.active ? '3px solid #3b82f6' : '3px solid transparent'};
+  background: ${props => props.active ? '#f1f5f9' : 'transparent'};
+  border-radius: 6px;
   transition: all 0.2s ease;
 
   &:hover {
-    color: #f1f5f9;
-    background: #334155;
+    color: #0f172a;
+    background: #f1f5f9;
   }
 `;
 
@@ -95,7 +96,7 @@ const NavIcon = styled.div`
   font-size: 1.125rem;
   display: flex;
   align-items: center;
-  color: #94a3b8;
+  color: ${props => props.active ? '#3b82f6' : '#94a3b8'};
 `;
 
 const NavText = styled.span`
@@ -131,7 +132,7 @@ const Sidebar = ({ isOpen, onToggle }) => {
             to={item.path}
             active={location.pathname === item.path ? 1 : 0}
           >
-            <NavIcon>
+            <NavIcon active={location.pathname === item.path ? 1 : 0}>
               <item.icon />
             </NavIcon>
             <NavText>{item.label}</NavText>
