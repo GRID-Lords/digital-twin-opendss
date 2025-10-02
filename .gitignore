@@ -33,3 +33,6 @@ frontend/node_modules/
 # AI/ML models (large binary files - retrain locally)
 models/
 *.pkl
+
+# Archived documentation
+.archived_docs/
