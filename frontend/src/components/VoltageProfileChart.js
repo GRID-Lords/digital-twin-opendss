@@ -25,20 +25,38 @@ const VoltageProfileChart = ({ assets }) => {
     : (assets || {});
 
   const voltageData = Object.entries(assetsObj)
-    .filter(([_, asset]) => asset && asset.voltage > 0)
-    .map(([assetId, asset]) => ({
-      name: assetId,
-      voltage: asset.voltage,
-      status: asset.status
-    }))
-    .sort((a, b) => b.voltage - a.voltage);
+    .filter(([_, asset]) => {
+      if (!asset || !asset.parameters) return false;
+      // Extract voltage value from parameters.voltage string (e.g., "400 kV" -> 400)
+      const voltageStr = asset.parameters.voltage || asset.parameters.hv_voltage || '';
+      const voltageNum = typeof voltageStr === 'string'
+        ? parseFloat(voltageStr.replace(/[^\d.]/g, ''))
+        : voltageStr;
+      return voltageNum > 0;
+    })
+    .map(([assetId, asset]) => {
+      // Extract voltage value from parameters
+      const voltageStr = asset.parameters.voltage || asset.parameters.hv_voltage || '0';
+      const voltageNum = typeof voltageStr === 'string'
+        ? parseFloat(voltageStr.replace(/[^\d.]/g, ''))
+        : voltageStr;
+
+      return {
+        name: asset.name || assetId,
+        voltage: voltageNum,
+        status: asset.status
+      };
+    })
+    .sort((a, b) => b.voltage - a.voltage)
+    .slice(0, 20); // Show top 20 assets
 
   const getBarColor = (status) => {
     switch (status) {
+      case 'operational': return '#4ade80';
       case 'healthy': return '#4ade80';
       case 'warning': return '#f59e0b';
       case 'fault': return '#ef4444';
-      default: return '#6b7280';
+      default: return '#3b82f6';
     }
   };
 
