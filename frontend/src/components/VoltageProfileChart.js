@@ -27,23 +27,20 @@ const VoltageProfileChart = ({ assets }) => {
   const voltageData = Object.entries(assetsObj)
     .filter(([_, asset]) => {
       if (!asset || !asset.parameters) return false;
-      // Extract voltage value from parameters.voltage string (e.g., "400 kV" -> 400)
-      const voltageStr = asset.parameters.voltage || asset.parameters.hv_voltage || '';
-      const voltageNum = typeof voltageStr === 'string'
-        ? parseFloat(voltageStr.replace(/[^\d.]/g, ''))
-        : voltageStr;
-      return voltageNum > 0;
+      // Use actual measured voltage (hv_voltage) instead of rated voltage
+      const measuredVoltage = asset.parameters.hv_voltage || asset.parameters.lv_voltage;
+      return measuredVoltage && measuredVoltage > 0;
     })
     .map(([assetId, asset]) => {
-      // Extract voltage value from parameters
-      const voltageStr = asset.parameters.voltage || asset.parameters.hv_voltage || '0';
-      const voltageNum = typeof voltageStr === 'string'
-        ? parseFloat(voltageStr.replace(/[^\d.]/g, ''))
-        : voltageStr;
+      // Use actual measured voltage values for better visualization
+      // hv_voltage = high voltage side (400kV side)
+      // lv_voltage = low voltage side (220kV side)
+      const measuredVoltage = asset.parameters.hv_voltage || asset.parameters.lv_voltage || 0;
 
       return {
         name: asset.name || assetId,
-        voltage: voltageNum,
+        voltage: measuredVoltage,
+        ratedVoltage: parseFloat((asset.parameters.voltage || '0').replace(/[^\d.]/g, '')),
         status: asset.status
       };
     })
@@ -63,6 +60,7 @@ const VoltageProfileChart = ({ assets }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const deviation = data.ratedVoltage ? ((data.voltage - data.ratedVoltage) / data.ratedVoltage * 100).toFixed(2) : 0;
       return (
         <div style={{
           background: 'rgba(0, 0, 0, 0.8)',
@@ -71,8 +69,16 @@ const VoltageProfileChart = ({ assets }) => {
           color: 'white',
           fontSize: '0.9rem'
         }}>
-          <p>{`Asset: ${label}`}</p>
-          <p style={{ color: '#4ade80' }}>{`Voltage: ${data.voltage.toFixed(1)} kV`}</p>
+          <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>{label}</p>
+          <p style={{ color: '#4ade80' }}>{`Measured: ${data.voltage.toFixed(2)} kV`}</p>
+          {data.ratedVoltage > 0 && (
+            <>
+              <p style={{ color: '#94a3b8' }}>{`Rated: ${data.ratedVoltage} kV`}</p>
+              <p style={{ color: Math.abs(deviation) > 5 ? '#f59e0b' : '#4ade80' }}>
+                {`Deviation: ${deviation > 0 ? '+' : ''}${deviation}%`}
+              </p>
+            </>
+          )}
           <p style={{ color: getBarColor(data.status) }}>{`Status: ${data.status}`}</p>
         </div>
       );

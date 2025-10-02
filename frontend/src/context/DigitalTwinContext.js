@@ -43,9 +43,14 @@ export const DigitalTwinProvider = ({ children }) => {
         websocket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+
+            // Handle different message types
             if (data.type === 'update') {
               setAssets(data.assets || {});
               setMetrics(data.metrics || {});
+            } else if (data.total_power !== undefined || data.efficiency !== undefined) {
+              // Real-time metrics update (sent every second)
+              setMetrics(data);
             }
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);
@@ -205,13 +210,7 @@ export const DigitalTwinProvider = ({ children }) => {
 
   // Optimized auto-refresh strategy
   useEffect(() => {
-    // Fetch real-time data from cache frequently
-    const refreshRealtimeData = () => {
-      fetchRealtimeSummary(); // Get cached real-time data
-      fetchMetrics(); // Get current metrics
-    };
-
-    // Fetch slower-changing data less frequently
+    // Fetch slower-changing data
     const refreshSlowData = () => {
       fetchAssets();
       fetchSCADAData();
@@ -220,16 +219,15 @@ export const DigitalTwinProvider = ({ children }) => {
     };
 
     // Initial load
-    refreshRealtimeData();
+    fetchMetrics(); // Initial metrics load
     refreshSlowData();
     fetchHistoricalMetrics(24); // Load last 24 hours
 
-    // Different refresh intervals for different data types
-    const realtimeInterval = setInterval(refreshRealtimeData, 10000); // Every 10 seconds for real-time
-    const slowInterval = setInterval(refreshSlowData, 60000); // Every 60 seconds for slow data
+    // Slow refresh for data that changes infrequently
+    // Metrics come via WebSocket (every 1 second), no need to poll
+    const slowInterval = setInterval(refreshSlowData, 60000); // Every 60 seconds
 
     return () => {
-      clearInterval(realtimeInterval);
       clearInterval(slowInterval);
     };
   }, []);
