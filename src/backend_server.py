@@ -317,6 +317,12 @@ async def get_current_metrics():
     # Generate real-time metrics
     total_power = 350 + np.random.normal(0, 10)
     efficiency = 92 + np.random.normal(0, 2)
+    power_factor = 0.95 + np.random.normal(0, 0.02)
+
+    # Calculate power flow values
+    active_power = total_power
+    reactive_power = active_power * np.tan(np.arccos(power_factor))
+    apparent_power = active_power / power_factor
 
     metrics = {
         "timestamp": timestamp.isoformat(),
@@ -324,7 +330,7 @@ async def get_current_metrics():
         "total_load": total_power,
         "total_power": total_power,
         "efficiency": efficiency,
-        "power_factor": 0.95 + np.random.normal(0, 0.02),
+        "power_factor": power_factor,
         "voltage_stability": 98 + np.random.normal(0, 1),
         "frequency": 50 + np.random.normal(0, 0.1),
         "generation": total_power * 1.05,  # Generation slightly higher than load
@@ -338,6 +344,29 @@ async def get_current_metrics():
 
     # Buffer metrics for periodic database storage (hourly)
     await data_manager.buffer_metrics(metrics)
+
+    # Store power flow data to timeseries database every minute
+    try:
+        from timeseries_db import timeseries_db
+        # Store only once per minute to avoid excessive database writes
+        if not hasattr(get_current_metrics, '_last_power_flow_store'):
+            get_current_metrics._last_power_flow_store = 0
+
+        current_time = time.time()
+        if current_time - get_current_metrics._last_power_flow_store >= 60:  # 60 seconds
+            timeseries_db.insert_power_flow({
+                'active_power': active_power,
+                'reactive_power': reactive_power,
+                'apparent_power': apparent_power,
+                'power_factor': power_factor,
+                'frequency': metrics['frequency'],
+                'voltage_400kv': 400 + np.random.normal(0, 2),
+                'voltage_220kv': 220 + np.random.normal(0, 1.5)
+            }, timestamp)
+            get_current_metrics._last_power_flow_store = current_time
+            logger.debug("Stored power flow data to timeseries database")
+    except Exception as e:
+        logger.error(f"Failed to store power flow data: {e}")
 
     # Add AI predictions if available
     if ai_manager:
