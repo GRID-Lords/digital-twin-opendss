@@ -645,9 +645,13 @@ async def get_timeseries_power_flow(
             for record in db_data:
                 ts = record.get('time')
                 if ts:
-                    # Convert to IST
+                    # InfluxDB returns UTC time - convert to IST
+                    from datetime import timezone as tz
                     if ts.tzinfo is None:
-                        ts = ts.replace(tzinfo=IST)
+                        # Assume UTC and convert to IST
+                        ts = ts.replace(tzinfo=tz.utc).astimezone(IST)
+                    elif ts.tzinfo != IST:
+                        ts = ts.astimezone(IST)
                     ts_key = ts.isoformat()
 
                     field = record.get('field', record.get('_field'))
@@ -659,8 +663,6 @@ async def get_timeseries_power_flow(
                     # Map InfluxDB field names to frontend expected names
                     if field == 'total_power_mw':
                         grouped_data[ts_key]['active_power'] = value
-                        grouped_data[ts_key]['reactive_power'] = value * 0.28  # Approximate from PF
-                        grouped_data[ts_key]['apparent_power'] = value * 1.04  # Approximate
                     elif field == 'power_factor':
                         grouped_data[ts_key]['power_factor'] = value
                     elif field == 'voltage_400kv':
@@ -680,12 +682,26 @@ async def get_timeseries_power_flow(
                 if active_power == 0 and current_metrics:
                     active_power = current_metrics.get('total_power', 0)
 
+                # Get power factor (default to typical value)
+                power_factor = point.get('power_factor', 0.58)
+
+                # Calculate reactive and apparent power from active power and power factor
+                # P = S * pf, therefore S = P / pf
+                # Q = sqrt(S^2 - P^2)
+                import math
+                if active_power > 0 and power_factor > 0:
+                    apparent_power = active_power / power_factor
+                    reactive_power = math.sqrt(max(0, apparent_power**2 - active_power**2))
+                else:
+                    apparent_power = 0
+                    reactive_power = 0
+
                 all_points.append({
                     "timestamp": point.get('timestamp'),
                     "active_power": round(active_power, 2),
-                    "reactive_power": round(point.get('reactive_power', active_power * 0.28), 2),
-                    "apparent_power": round(point.get('apparent_power', active_power * 1.04), 2),
-                    "power_factor": round(point.get('power_factor', 0.95), 3),
+                    "reactive_power": round(reactive_power, 2),
+                    "apparent_power": round(apparent_power, 2),
+                    "power_factor": round(power_factor, 3),
                     "voltage_400kv": round(point.get('voltage_400kv', 400), 2),
                     "voltage_220kv": round(point.get('voltage_220kv', 220), 2),
                     "frequency": round(point.get('frequency', 50.0), 2)
@@ -699,8 +715,8 @@ async def get_timeseries_power_flow(
                 # Group by resolution intervals and average
                 interval_groups = {}
                 for point in all_points:
-                    ts = datetime.fromisoformat(point['timestamp'].replace('+00:00', ''))
-                    # Round down to nearest interval
+                    ts = datetime.fromisoformat(point['timestamp'])
+                    # Round down to nearest interval (preserve timezone)
                     interval_ts = ts.replace(minute=(ts.minute // resolution_minutes) * resolution_minutes, second=0, microsecond=0)
                     interval_key = interval_ts.isoformat()
 
@@ -709,10 +725,10 @@ async def get_timeseries_power_flow(
                     interval_groups[interval_key].append(point)
 
                 # Average each interval group
-                for interval_ts in sorted(interval_groups.keys()):
-                    points_in_interval = interval_groups[interval_ts]
+                for interval_ts_str in sorted(interval_groups.keys()):
+                    points_in_interval = interval_groups[interval_ts_str]
                     data_points.append({
-                        "timestamp": interval_ts + '+05:30',  # Add IST timezone
+                        "timestamp": interval_ts_str,  # Already includes timezone
                         "active_power": round(sum(p['active_power'] for p in points_in_interval) / len(points_in_interval), 2),
                         "reactive_power": round(sum(p['reactive_power'] for p in points_in_interval) / len(points_in_interval), 2),
                         "apparent_power": round(sum(p['apparent_power'] for p in points_in_interval) / len(points_in_interval), 2),

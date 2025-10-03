@@ -42,13 +42,18 @@ class DigitalTwinDatabase:
 
         self.init_database()
 
+    @property
+    def placeholder(self):
+        """Get the appropriate SQL placeholder for the current database"""
+        return '%s' if self.use_postgres else '?'
+
     @contextmanager
     def get_connection(self):
         """Thread-safe database connection."""
         if not hasattr(self.local, 'connection') or self.local.connection is None:
             if self.use_postgres:
                 try:
-                    self.local.connection = psycopg2.connect(**self.conn_params)
+                    self.local.connection = psycopg2.connect(**self.conn_params, cursor_factory=RealDictCursor)
                 except Exception as e:
                     logger.error(f"PostgreSQL connection failed: {e}, falling back to SQLite")
                     self.use_postgres = False
@@ -207,22 +212,43 @@ class DigitalTwinDatabase:
         """Store system metrics."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO metrics (
-                    total_power, efficiency, power_factor, frequency,
-                    total_load, generation, losses, data
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                metrics.get('total_power', 0),
-                metrics.get('efficiency', 0),
-                metrics.get('power_factor', 0),
-                metrics.get('frequency', 50),
-                metrics.get('total_load', 0),
-                metrics.get('generation', 0),
-                metrics.get('losses', 0),
-                json.dumps(metrics)
-            ))
-            return cursor.lastrowid
+            ph = self.placeholder
+            if self.use_postgres:
+                cursor.execute(f'''
+                    INSERT INTO metrics (
+                        total_power, efficiency, power_factor, frequency,
+                        total_load, generation, losses, data
+                    ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    RETURNING id
+                ''', (
+                    metrics.get('total_power', 0),
+                    metrics.get('efficiency', 0),
+                    metrics.get('power_factor', 0),
+                    metrics.get('frequency', 50),
+                    metrics.get('total_load', 0),
+                    metrics.get('generation', 0),
+                    metrics.get('losses', 0),
+                    json.dumps(metrics)
+                ))
+                result = cursor.fetchone()
+                return result[0] if result else None
+            else:
+                cursor.execute(f'''
+                    INSERT INTO metrics (
+                        total_power, efficiency, power_factor, frequency,
+                        total_load, generation, losses, data
+                    ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                ''', (
+                    metrics.get('total_power', 0),
+                    metrics.get('efficiency', 0),
+                    metrics.get('power_factor', 0),
+                    metrics.get('frequency', 50),
+                    metrics.get('total_load', 0),
+                    metrics.get('generation', 0),
+                    metrics.get('losses', 0),
+                    json.dumps(metrics)
+                ))
+                return cursor.lastrowid
 
     def store_asset_state(self, asset_id: str, asset_data: Dict[str, Any]):
         """Store asset state snapshot."""
@@ -252,9 +278,15 @@ class DigitalTwinDatabase:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO alerts (alert_type, severity, asset_id, message, data)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
             ''', (alert_type, severity, asset_id, message, json.dumps(data or {})))
-            return cursor.lastrowid
+            result = cursor.fetchone()
+            if result:
+                # With RealDictCursor (PostgreSQL), result is a dict
+                # With sqlite3.Row (SQLite), result is row-like
+                return result.get('id') if hasattr(result, 'get') else result[0]
+            return None
 
     def store_ai_analysis(self, analysis_type: str, asset_id: str, results: Dict[str, Any]):
         """Store AI analysis results."""
@@ -306,7 +338,8 @@ class DigitalTwinDatabase:
         """Get recent alerts."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            query = '''
+
+            query = f'''
                 SELECT * FROM alerts
                 WHERE 1=1
             '''
@@ -315,7 +348,7 @@ class DigitalTwinDatabase:
             if unresolved_only:
                 query += ' AND resolved = FALSE'
 
-            query += ' ORDER BY timestamp DESC LIMIT ?'
+            query += f' ORDER BY timestamp DESC LIMIT {self.placeholder}'
             params.append(limit)
 
             cursor.execute(query, params)

@@ -56,27 +56,35 @@ const FullWidthChart = styled.div`
 
 const Dashboard = () => {
   const { metrics, assets } = useDigitalTwin();
+  const [lastUpdated, setLastUpdated] = React.useState(new Date());
+
+  // Update timestamp when metrics change
+  React.useEffect(() => {
+    if (metrics && Object.keys(metrics).length > 0) {
+      setLastUpdated(new Date());
+    }
+  }, [metrics]);
 
   // No need to fetch on mount - DigitalTwinContext already handles auto-refresh
 
   const metricCards = [
     {
       title: 'Total Power',
-      value: `${metrics.total_power?.toFixed(1) || 0} MW`,
+      value: `${metrics.total_power?.toFixed(2) || 0} MW`,
       icon: '',
       color: '#10b981',
       trend: '+2.3%'
     },
     {
       title: 'Efficiency',
-      value: `${metrics.efficiency?.toFixed(1) || 0}%`,
+      value: `${metrics.efficiency?.toFixed(2) || 0}%`,
       icon: '',
       color: '#3b82f6',
       trend: '+0.5%'
     },
     {
       title: 'Voltage Stability',
-      value: `${metrics.voltage_stability?.toFixed(1) || 0}%`,
+      value: `${metrics.voltage_stability?.toFixed(2) || 0}%`,
       icon: '',
       color: '#8b5cf6',
       trend: '+1.2%'
@@ -95,7 +103,7 @@ const Dashboard = () => {
       <DashboardHeader>
         <Title>Substation Overview</Title>
         <LastUpdated>
-          Last updated: {new Date().toLocaleTimeString()}
+          Last updated: {lastUpdated.toLocaleTimeString()}
         </LastUpdated>
       </DashboardHeader>
 

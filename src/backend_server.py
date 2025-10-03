@@ -13,6 +13,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+import pytz
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,6 +44,9 @@ from src.monitoring import alert_service, ai_insights_service
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# IST timezone for all timestamps
+IST = pytz.timezone('Asia/Kolkata')
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -211,7 +215,7 @@ async def real_time_data_generator():
     while True:
         try:
             # Generate synthetic SCADA data
-            timestamp = datetime.now()
+            timestamp = datetime.now(IST)
 
             # Get real metrics from assets and load flow
             transformers_data = {}
@@ -317,8 +321,8 @@ async def asset_data_updater():
                         current = rt_data.get('current_a', asset.electrical.current_rating_a * 0.7)
                         power = voltage * current / 1000  # MW
 
-                        # Calculate age in days
-                        age_delta = datetime.now() - asset.commissioned_date
+                        # Calculate age in days (remove timezone for calculation)
+                        age_delta = datetime.now(IST).replace(tzinfo=None) - asset.commissioned_date
                         age_days = age_delta.days
 
                         asset_data = {
@@ -468,7 +472,7 @@ async def run_opendss_and_update_assets():
 
 async def get_current_metrics():
     """Get current system metrics from real OpenDSS power flow data"""
-    timestamp = datetime.now()
+    timestamp = datetime.now(IST)
 
     # Run OpenDSS and update assets
     flow_results = await run_opendss_and_update_assets()
@@ -502,12 +506,16 @@ async def get_current_metrics():
     # Use OpenDSS results from flow_results
     voltage_400kv = 0
     voltage_220kv = 0
+    max_voltage_pu = 1.0
+    min_voltage_pu = 1.0
     if flow_results:
         power_factor = flow_results.get('power_factor', 0.95)
         losses_mw = flow_results.get('total_losses_mw', total_power * 0.03)
         total_power_kw = flow_results.get('total_power_kw', 0)
         voltage_400kv = flow_results.get('voltage_400kv', 0)
         voltage_220kv = flow_results.get('voltage_220kv', 0)
+        max_voltage_pu = flow_results.get('max_voltage_pu', 1.0)
+        min_voltage_pu = flow_results.get('min_voltage_pu', 1.0)
         if total_power_kw != 0:
             # Use absolute value (negative means source power in OpenDSS)
             total_power = abs(total_power_kw) / 1000  # Convert kW to MW
@@ -523,26 +531,32 @@ async def get_current_metrics():
     reactive_power = active_power * np.tan(np.arccos(power_factor))
     apparent_power = active_power / power_factor
 
-    # Voltage stability from asset voltages
-    voltage_stability = 98.5  # Can be calculated from actual bus voltages
-    frequency = 50.0  # Would come from SCADA in real system
+    # Calculate voltage stability from actual bus voltages
+    # Voltage stability based on how close all buses are to 1.0 pu (nominal)
+    # Maximum deviation from 1.0 pu determines stability
+    max_deviation = max(abs(max_voltage_pu - 1.0), abs(min_voltage_pu - 1.0))
+    voltage_stability = 100 - (max_deviation * 100)  # Higher stability = lower deviation
+
+    # Realistic frequency with small variations (Indian grid: 50 Hz ± 0.03 Hz)
+    # Add small random variation to simulate grid dynamics
+    frequency = 50.0 + np.random.uniform(-0.03, 0.03)
 
     metrics = {
         "timestamp": timestamp.isoformat(),
-        "system_health": round(system_health, 2),  # From actual asset health
-        "total_load": round(total_power, 2),
-        "total_power": round(total_power, 2),
-        "efficiency": round(efficiency, 2),  # From actual losses
-        "power_factor": round(power_factor, 3),
-        "voltage_stability": round(voltage_stability, 2),
-        "frequency": round(frequency, 2),
-        "generation": round(total_power + losses_mw, 2),  # Load + losses
-        "losses": round(losses_mw, 2),  # Real losses
-        "active_power": round(active_power, 2),
-        "reactive_power": round(reactive_power, 2),
-        "apparent_power": round(apparent_power, 2),
-        "voltage_400kv": round(voltage_400kv, 2),  # From OpenDSS
-        "voltage_220kv": round(voltage_220kv, 2),  # From OpenDSS
+        "system_health": round(system_health, 4),  # From actual asset health
+        "total_load": round(total_power, 4),
+        "total_power": round(total_power, 4),
+        "efficiency": round(efficiency, 4),  # From actual losses
+        "power_factor": round(power_factor, 4),
+        "voltage_stability": round(voltage_stability, 4),
+        "frequency": round(frequency, 4),
+        "generation": round(total_power + losses_mw, 4),  # Load + losses
+        "losses": round(losses_mw, 4),  # Real losses
+        "active_power": round(active_power, 4),
+        "reactive_power": round(reactive_power, 4),
+        "apparent_power": round(apparent_power, 4),
+        "voltage_400kv": round(voltage_400kv, 4),  # From OpenDSS
+        "voltage_220kv": round(voltage_220kv, 4),  # From OpenDSS
         "alerts": [],
         "predictions": {}
     }
@@ -1098,7 +1112,7 @@ async def get_scada_data():
         recent_data = scada.get_integrated_data()
         return {
             "status": "connected",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(IST).isoformat(),
             "data": recent_data,
             "points_count": len(recent_data) if isinstance(recent_data, list) else 0
         }
@@ -1332,7 +1346,7 @@ async def run_simulation(request: SimulationRequest):
 
         return {
             "scenario": request.scenario,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(IST).isoformat(),
             "results": results,
             "status": "completed"
         }
@@ -1362,7 +1376,7 @@ async def get_ai_analysis():
                 'power': voltage * current / 1000,
                 'temperature': asset.thermal.temperature_celsius,
                 'health_score': asset.health.overall_health,
-                'age_days': (datetime.now() - asset.commissioned_date).days
+                'age_days': (datetime.now(IST).replace(tzinfo=None) - asset.commissioned_date).days
             }
 
             assets_dict[asset_id] = {
@@ -1420,7 +1434,7 @@ async def get_ai_analysis():
         llm_insights = generate_llm_insights(anomalies, predictions, optimization, metrics, current_data)
 
         return {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(IST).isoformat(),
             "anomalies": anomalies,
             "predictions": predictions,
             "optimization": optimization,
@@ -1445,7 +1459,7 @@ async def get_iot_devices():
                     "type": asset.asset_type.value,
                     "status": "online" if asset.status.value == "operational" else "offline",
                     "location": asset.location,
-                    "last_update": datetime.now().isoformat(),
+                    "last_update": datetime.now(IST).isoformat(),
                     "metrics": {
                         "temperature": asset.thermal.temperature_celsius,
                         "health_score": asset.health.overall_health,
@@ -1457,7 +1471,7 @@ async def get_iot_devices():
             "devices": devices,
             "total_count": len(devices),
             "online_count": len([d for d in devices if d["status"] == "online"]),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(IST).isoformat()
         }
     except Exception as e:
         logger.error(f"IoT devices error: {e}")
@@ -1477,7 +1491,7 @@ async def send_control_command(command: ControlCommand):
             "asset_id": command.asset_id,
             "command": command.command,
             "value": command.value,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(IST).isoformat(),
             "confirmation": f"Command {command.command} sent to {command.asset_id}"
         }
     except Exception as e:
@@ -1536,7 +1550,7 @@ async def get_realtime_summary():
 async def cleanup_old_data():
     """Trigger cleanup of old data"""
     await data_manager.cleanup_old_data()
-    return {"status": "cleanup_completed", "timestamp": datetime.now().isoformat()}
+    return {"status": "cleanup_completed", "timestamp": datetime.now(IST).isoformat()}
 
 @app.get("/health")
 async def health_check():
@@ -1544,7 +1558,7 @@ async def health_check():
     cache_stats = data_manager.get_cache_stats()
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(IST).isoformat(),
         "components": {
             "scada": scada is not None,
             "load_flow": load_flow is not None,

@@ -43,14 +43,22 @@ export const DigitalTwinProvider = ({ children }) => {
         websocket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', new Date().toLocaleTimeString(), data);
 
             // Handle different message types
             if (data.type === 'update') {
               setAssets(data.assets || {});
               setMetrics(data.metrics || {});
+              console.log('Updated assets and metrics via WebSocket');
             } else if (data.total_power !== undefined || data.efficiency !== undefined) {
               // Real-time metrics update (sent every second)
               setMetrics(data);
+              console.log('Updated metrics via WebSocket:', {
+                power: data.total_power,
+                efficiency: data.efficiency,
+                voltage_stability: data.voltage_stability,
+                frequency: data.frequency
+              });
             }
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);

@@ -63,7 +63,7 @@ class AnomalyResponse(BaseModel):
     anomaly_id: str
     type: str
     location: str
-    severity: str
+    severity: float
     start_time: str
     duration_ms: int
     impact: Dict[str, Any]
@@ -100,67 +100,13 @@ async def trigger_anomaly(request: AnomalyRequest):
                 detail=f"Another anomaly '{active_anomaly['type']}' is currently active. Please wait for it to complete or stop it first."
             )
 
-        simulator = get_simulator()
-
-        # Map frontend anomaly types to simulator methods
-        anomaly_map = {
-            'voltage_sag': lambda: simulator.inject_voltage_sag(
-                request.location,
-                magnitude=0.7 if request.severity == 'high' else 0.8,
-                duration_cycles=30,
-                phases=['A', 'B', 'C']
-            ),
-            'voltage_swell': lambda: simulator.inject_voltage_sag(
-                request.location,
-                magnitude=1.2 if request.severity == 'high' else 1.1,
-                duration_cycles=20,
-                phases=['A', 'B', 'C']
-            ),
-            'ground_fault': lambda: simulator.inject_ground_fault(
-                request.location,
-                fault_resistance=0.01 if request.severity == 'high' else 0.1,
-                phase='A'
-            ),
-            'harmonic_distortion': lambda: simulator.inject_harmonic_distortion(
-                request.location,
-                harmonics={
-                    3: 0.05 if request.severity == 'low' else 0.1,
-                    5: 0.08 if request.severity == 'low' else 0.15,
-                    7: 0.03 if request.severity == 'low' else 0.08
-                }
-            ),
-            'transformer_overload': lambda: simulator.inject_transformer_overload(
-                request.parameters.get('transformer', 'TR1'),
-                overload_factor=1.3 if request.severity == 'medium' else 1.5
-            ),
-            'capacitor_switching': lambda: simulator.inject_capacitor_switching(
-                request.parameters.get('capacitor', 'Cap1')
-            ),
-            'ct_saturation': lambda: simulator.inject_ct_saturation(
-                request.location,
-                saturation_level=0.7 if request.severity == 'high' else 0.85
-            ),
-            'frequency_deviation': lambda: simulator.inject_frequency_deviation(
-                deviation_hz=0.5 if request.severity == 'medium' else 1.0
-            )
-        }
-
-        # Execute anomaly injection
-        if request.type in anomaly_map:
-            result = anomaly_map[request.type]()
-        else:
-            raise ValueError(f"Unknown anomaly type: {request.type}")
+        # Use severity value (defaults to 0.7 for moderate severity)
+        severity_value = request.severity if request.severity is not None else 0.7
 
         # Generate anomaly ID
         anomaly_id = f"ANM_{datetime.now().strftime('%Y%m%d%H%M%S')}_{request.type}"
 
-        # Calculate impact metrics
-        impact = calculate_anomaly_impact(result, request.type)
-
-        # Generate visualization data for frontend
-        viz_data = generate_visualization_data(result, request.type)
-
-        # === GENERATE INSIGHTS & STORE ALERT ===
+        # === GENERATE INSIGHTS & STORE ALERT FIRST (before simulation) ===
         # Get predefined insights for this anomaly type
         insights = get_anomaly_insights(
             request.type,
@@ -169,7 +115,7 @@ async def trigger_anomaly(request: AnomalyRequest):
             request.parameters
         )
 
-        # Store alert with insights in database
+        # Store alert with insights in database (ALWAYS store, even if simulation fails)
         try:
             from src.database import db
             from src.monitoring.alert_service import alert_service
@@ -185,17 +131,16 @@ async def trigger_anomaly(request: AnomalyRequest):
             # Store in database
             alert_id = db.store_alert(
                 alert_type='anomaly_simulation',
-                severity=insights['severity_level'],
+                severity=insights.get('severity_level', 'high'),
                 asset_id=request.location,
                 message=alert_description,
                 data={
                     'anomaly_id': anomaly_id,
                     'anomaly_type': request.type,
-                    'severity_value': request.severity,
+                    'severity_value': severity_value,
                     'duration': request.duration,
                     'parameters': request.parameters,
-                    'insights': insights,
-                    'impact_metrics': impact
+                    'insights': insights
                 }
             )
 
@@ -205,20 +150,104 @@ async def trigger_anomaly(request: AnomalyRequest):
             logger.warning(f"Failed to store alert in database: {db_error}")
             # Continue even if database storage fails
 
-        # Schedule auto-clear after duration
-        asyncio.create_task(clear_anomaly_after_delay(
-            anomaly_id,
-            request.duration / 1000  # Convert to seconds
-        ))
+        # === NOW ATTEMPT SIMULATION (optional - will continue if fails) ===
+        result = None
+        impact = {}
+        viz_data = {}
+
+        try:
+            simulator = get_simulator()
+
+            # Map frontend anomaly types to simulator methods
+            anomaly_map = {
+                'voltage_sag': lambda: simulator.inject_voltage_sag(
+                    request.location,
+                    magnitude=severity_value,  # Use provided severity directly (0.7 = 70% voltage)
+                    duration_cycles=30,
+                    phases=['A', 'B', 'C']
+                ),
+                'voltage_swell': lambda: simulator.inject_voltage_sag(
+                    request.location,
+                    magnitude=1.0 + (1.0 - severity_value),  # Invert for swell (0.7 becomes 1.3)
+                    duration_cycles=20,
+                    phases=['A', 'B', 'C']
+                ),
+                'ground_fault': lambda: simulator.inject_ground_fault(
+                    request.location,
+                    fault_resistance=0.01 * (1.0 - severity_value),  # Lower resistance = higher severity
+                    phase='A'
+                ),
+                'harmonic_distortion': lambda: simulator.inject_harmonic_distortion(
+                    request.location,
+                    harmonics={
+                        3: 0.05 * (1.0 - severity_value),
+                        5: 0.08 * (1.0 - severity_value),
+                        7: 0.03 * (1.0 - severity_value)
+                    }
+                ),
+                'transformer_overload': lambda: simulator.inject_transformer_overload(
+                    request.parameters.get('transformer', 'TR1'),
+                    overload_factor=1.0 + (1.0 - severity_value)  # 0.7 becomes 1.3x overload
+                ),
+                'capacitor_switching': lambda: simulator.inject_capacitor_switching(
+                    request.parameters.get('capacitor', 'Cap1')
+                ),
+                'ct_saturation': lambda: simulator.inject_ct_saturation(
+                    request.location,
+                    saturation_level=severity_value
+                ),
+                'frequency_deviation': lambda: simulator.inject_frequency_deviation(
+                    deviation_hz=0.5 * (1.0 - severity_value)
+                )
+            }
+
+            # Execute anomaly injection
+            if request.type in anomaly_map:
+                result = anomaly_map[request.type]()
+            else:
+                raise ValueError(f"Unknown anomaly type: {request.type}")
+
+            # Calculate impact metrics
+            impact = calculate_anomaly_impact(result, request.type)
+
+            # Generate visualization data for frontend
+            viz_data = generate_visualization_data(result, request.type)
+
+        except Exception as sim_error:
+            logger.warning(f"Simulation failed (continuing with alert record): {sim_error}")
+            # Use default impact values
+            impact = {
+                'severity_score': severity_value,
+                'affected_components': [],
+                'voltage_deviation': 0,
+                'current_deviation': 0,
+                'power_loss': 0.0,
+                'insights': insights
+            }
+
+        # Store active anomaly info for persistence
+        active_anomaly = {
+            'id': anomaly_id,
+            'type': request.type,
+            'location': request.location,
+            'severity': severity_value,
+            'start_time': datetime.now().isoformat()
+        }
+
+        # NOTE: Auto-clear disabled - user must manually clear via /clear endpoint
+        # asyncio.create_task(clear_anomaly_after_delay(
+        #     anomaly_id,
+        #     request.duration / 1000  # Convert to seconds
+        # ))
 
         response = AnomalyResponse(
             success=True,
             anomaly_id=anomaly_id,
             type=request.type,
             location=request.location,
-            severity=request.severity or 0.85,
+            severity=severity_value,
             start_time=datetime.now().isoformat(),
-            duration_ms=int(request.duration * 1000),  # Convert to milliseconds
+            duration_ms=int(request.duration * 1000) if request.duration else 0,  # Convert to milliseconds
             impact={**impact, 'insights': insights},  # Include insights in impact
             visualization_data=viz_data
         )
@@ -288,11 +317,17 @@ async def get_simulation_status():
 @router.post("/clear")
 async def clear_all_anomalies():
     """Clear all active anomalies and restore normal operation"""
+    global active_anomaly, active_anomaly_task
+
     try:
         simulator = get_simulator()
 
         # Re-initialize to clear all anomalies
         simulator._initialize_dss()
+
+        # Clear the active anomaly tracking
+        active_anomaly = None
+        active_anomaly_task = None
 
         return {
             "success": True,

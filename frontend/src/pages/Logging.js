@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FileText, Filter, Download, RefreshCw, AlertCircle, Info, AlertTriangle, CheckCircle } from 'lucide-react';
+import { FileText, Filter, Download, RefreshCw, AlertCircle, Info, AlertTriangle, CheckCircle, X, ExternalLink } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import ReactMarkdown from 'react-markdown';
 
 const LoggingContainer = styled.div`
   display: flex;
@@ -222,6 +223,199 @@ const SeverityBadge = styled.span`
   text-transform: uppercase;
 `;
 
+// Dialog Components
+const DialogOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+`;
+
+const DialogContainer = styled.div`
+  background: white;
+  border-radius: 12px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+`;
+
+const DialogHeader = styled.div`
+  padding: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+`;
+
+const DialogTitle = styled.h2`
+  color: #1e293b;
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0.5rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+`;
+
+const DialogBody = styled.div`
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+`;
+
+const DialogMeta = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+`;
+
+const MetaItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+`;
+
+const MetaLabel = styled.span`
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+`;
+
+const MetaValue = styled.span`
+  color: #1e293b;
+  font-size: 0.875rem;
+  font-weight: 500;
+`;
+
+const MarkdownContent = styled.div`
+  color: #334155;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #1e293b;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+  }
+
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.1rem; }
+
+  p {
+    margin-bottom: 1rem;
+  }
+
+  ul, ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  li {
+    margin-bottom: 0.5rem;
+  }
+
+  strong {
+    color: #1e293b;
+    font-weight: 600;
+  }
+
+  code {
+    background: #f1f5f9;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.875em;
+    font-family: 'Courier New', monospace;
+  }
+
+  pre {
+    background: #f1f5f9;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+  }
+
+  blockquote {
+    border-left: 4px solid #3b82f6;
+    padding-left: 1rem;
+    margin-left: 0;
+    color: #64748b;
+    font-style: italic;
+  }
+`;
+
+const ViewDetailsButton = styled.button`
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.2s;
+  font-weight: 500;
+
+  &:hover {
+    background: #2563eb;
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+`;
+
 const EmptyState = styled.div`
   text-align: center;
   padding: 3rem;
@@ -387,6 +581,7 @@ const Logging = () => {
   const [logs, setLogs] = useState(FALLBACK_LOGS);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedAlert, setSelectedAlert] = useState(null);
   const [filters, setFilters] = useState({
     days: 7,
     eventType: '',
@@ -442,6 +637,14 @@ const Logging = () => {
       case 'maintenance': return <CheckCircle />;
       default: return <Info />;
     }
+  };
+
+  const getSummary = (description) => {
+    if (!description) return '';
+    // Extract first line or first sentence before **
+    const firstLine = description.split('\n')[0];
+    // Limit to 120 characters
+    return firstLine.length > 120 ? firstLine.substring(0, 120) + '...' : firstLine;
   };
 
   const filteredLogs = logs.filter(log => {
@@ -575,7 +778,7 @@ const Logging = () => {
                     })}
                   </LogTime>
                 </LogHeader>
-                <LogDescription>{log.description}</LogDescription>
+                <LogDescription>{getSummary(log.description)}</LogDescription>
                 <LogMeta>
                   <SeverityBadge severity={log.severity}>
                     {log.severity}
@@ -586,6 +789,10 @@ const Logging = () => {
                   {log.duration && (
                     <MetaTag>Duration: {log.duration}min</MetaTag>
                   )}
+                  <ViewDetailsButton onClick={() => setSelectedAlert(log)}>
+                    <ExternalLink />
+                    View Details
+                  </ViewDetailsButton>
                 </LogMeta>
               </LogEntry>
             ))}
@@ -623,6 +830,74 @@ const Logging = () => {
           </>
         )}
       </LogsContainer>
+
+      {/* Alert Details Dialog */}
+      {selectedAlert && (
+        <DialogOverlay onClick={() => setSelectedAlert(null)}>
+          <DialogContainer onClick={(e) => e.stopPropagation()}>
+            <DialogHeader>
+              <DialogTitle>
+                {getEventIcon(selectedAlert.type)}
+                Alert Details
+              </DialogTitle>
+              <CloseButton onClick={() => setSelectedAlert(null)}>
+                <X />
+              </CloseButton>
+            </DialogHeader>
+
+            <DialogBody>
+              <DialogMeta>
+                <MetaItem>
+                  <MetaLabel>Type</MetaLabel>
+                  <MetaValue>{selectedAlert.type?.charAt(0).toUpperCase() + selectedAlert.type?.slice(1)}</MetaValue>
+                </MetaItem>
+                <MetaItem>
+                  <MetaLabel>Severity</MetaLabel>
+                  <MetaValue>
+                    <SeverityBadge severity={selectedAlert.severity}>
+                      {selectedAlert.severity}
+                    </SeverityBadge>
+                  </MetaValue>
+                </MetaItem>
+                <MetaItem>
+                  <MetaLabel>Asset ID</MetaLabel>
+                  <MetaValue>{selectedAlert.asset_id || 'N/A'}</MetaValue>
+                </MetaItem>
+                <MetaItem>
+                  <MetaLabel>Timestamp</MetaLabel>
+                  <MetaValue>
+                    {new Date(selectedAlert.timestamp).toLocaleString('en-IN', {
+                      timeZone: 'Asia/Kolkata',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })}
+                  </MetaValue>
+                </MetaItem>
+                {selectedAlert.acknowledged !== undefined && (
+                  <MetaItem>
+                    <MetaLabel>Status</MetaLabel>
+                    <MetaValue>{selectedAlert.acknowledged ? '✓ Acknowledged' : 'Pending'}</MetaValue>
+                  </MetaItem>
+                )}
+                {selectedAlert.duration && (
+                  <MetaItem>
+                    <MetaLabel>Duration</MetaLabel>
+                    <MetaValue>{selectedAlert.duration} minutes</MetaValue>
+                  </MetaItem>
+                )}
+              </DialogMeta>
+
+              <MarkdownContent>
+                <ReactMarkdown>{selectedAlert.description}</ReactMarkdown>
+              </MarkdownContent>
+            </DialogBody>
+          </DialogContainer>
+        </DialogOverlay>
+      )}
     </LoggingContainer>
   );
 };

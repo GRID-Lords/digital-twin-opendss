@@ -281,54 +281,44 @@ const AnomalySimulationPanel = () => {
   };
 
   const simulateScenario = async (scenario) => {
-    const isRunning = runningScenarios[scenario.id];
+    // Start the scenario
+    try {
+      const params = scenarioParams[scenario.id];
 
-    if (isRunning) {
-      // Stop the scenario
-      try {
-        const response = await axios.post('/api/simulation/stop', {
-          scenario_id: scenario.id
-        });
+      const response = await axios.post('/api/simulation/anomaly', {
+        type: scenario.id,
+        severity: params.severity,
+        location: params.location,
+        duration: params.duration || 5,
+        parameters: params
+      });
 
-        setRunningScenarios(prev => ({ ...prev, [scenario.id]: false }));
-        setStatusMessage({ type: 'success', text: `${scenario.name} simulation stopped` });
-        toast.success(`${scenario.name} simulation stopped`);
+      setRunningScenarios(prev => ({ ...prev, [scenario.id]: true }));
+      setStatusMessage({
+        type: 'success',
+        text: `${scenario.name} simulation started. Anomaly is now active and persisting...`
+      });
+      toast.success(`${scenario.name} simulation started`);
 
-        // Clear status after 3 seconds
-        setTimeout(() => setStatusMessage(null), 3000);
-      } catch (error) {
-        toast.error(`Failed to stop ${scenario.name}`);
-        setStatusMessage({ type: 'error', text: `Failed to stop ${scenario.name}: ${error.message}` });
-      }
-    } else {
-      // Start the scenario
-      try {
-        const params = scenarioParams[scenario.id];
+    } catch (error) {
+      toast.error(`Failed to start ${scenario.name}`);
+      setStatusMessage({ type: 'error', text: `Failed to start ${scenario.name}: ${error.response?.data?.detail || error.message}` });
+    }
+  };
 
-        const response = await axios.post('/api/simulation/anomaly', {
-          type: scenario.id,
-          parameters: params,
-          visualization: '3d'
-        });
+  const clearAllAnomalies = async () => {
+    try {
+      const response = await axios.post('/api/simulation/clear');
 
-        setRunningScenarios(prev => ({ ...prev, [scenario.id]: true }));
-        setStatusMessage({
-          type: 'success',
-          text: `${scenario.name} simulation started. OpenDSS is analyzing the impact...`
-        });
-        toast.success(`${scenario.name} simulation started`);
+      setRunningScenarios({});
+      setStatusMessage({ type: 'success', text: 'All anomalies cleared. System back to normal.' });
+      toast.success('System restored to normal operation');
 
-        // Auto-stop after duration
-        const duration = (params.duration || 5) * 1000;
-        setTimeout(() => {
-          setRunningScenarios(prev => ({ ...prev, [scenario.id]: false }));
-          setStatusMessage({ type: 'success', text: `${scenario.name} simulation completed` });
-        }, duration);
-
-      } catch (error) {
-        toast.error(`Failed to start ${scenario.name}`);
-        setStatusMessage({ type: 'error', text: `Failed to start ${scenario.name}: ${error.message}` });
-      }
+      // Clear status after 3 seconds
+      setTimeout(() => setStatusMessage(null), 3000);
+    } catch (error) {
+      toast.error('Failed to clear anomalies');
+      setStatusMessage({ type: 'error', text: `Failed to clear anomalies: ${error.message}` });
     }
   };
 
@@ -394,12 +384,21 @@ const AnomalySimulationPanel = () => {
             <SimulateButton
               onClick={() => simulateScenario(scenario)}
               isRunning={runningScenarios[scenario.id]}
+              disabled={runningScenarios[scenario.id]}
             >
-              {runningScenarios[scenario.id] ? 'Stop Simulation' : 'Start Simulation'}
+              {runningScenarios[scenario.id] ? 'Anomaly Active' : 'Start Simulation'}
             </SimulateButton>
           </ScenarioCard>
         ))}
       </ScenariosGrid>
+
+      <SimulateButton
+        onClick={clearAllAnomalies}
+        isRunning={true}
+        style={{ marginTop: '1.5rem', maxWidth: '400px', margin: '1.5rem auto 0' }}
+      >
+        🔧 Go Back to Normal - Clear All Anomalies
+      </SimulateButton>
 
       {statusMessage && (
         <StatusMessage type={statusMessage.type}>

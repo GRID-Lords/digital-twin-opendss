@@ -102,9 +102,14 @@ const PowerFlowChart = ({ metrics = {} }) => {
 
     // Transform to chart format (same as real data)
     return backendData.map(point => ({
-      time: new Date(point.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      time: new Date(point.timestamp).toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Asia/Kolkata'
+      }),
       power: point.activePower,
-      efficiency: (point.activePower / point.apparentPower) * 100
+      powerFactor: point.powerFactor * 100 // Convert to percentage (0.95 -> 95%)
     }));
   };
 
@@ -121,9 +126,14 @@ const PowerFlowChart = ({ metrics = {} }) => {
         if (historicalData.length > 0) {
           // Transform backend data to chart format
           const formattedData = historicalData.map(point => ({
-            time: new Date(point.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            time: new Date(point.timestamp).toLocaleTimeString('en-IN', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'Asia/Kolkata'
+            }),
             power: point.activePower || 0,
-            efficiency: ((point.activePower / (point.apparentPower || 1)) * 100) || 95
+            powerFactor: (point.powerFactor || 0.95) * 100 // Convert to percentage
           }));
 
           setData(formattedData);
@@ -170,9 +180,9 @@ const PowerFlowChart = ({ metrics = {} }) => {
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>Efficiency:</span>
+              <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>Power Factor:</span>
               <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#f65c5cff' }}>
-                {data.efficiency.toFixed(1)}%
+                {data.powerFactor.toFixed(1)}%
               </span>
             </div>
           </div>
@@ -185,8 +195,8 @@ const PowerFlowChart = ({ metrics = {} }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Power Flow & Efficiency</CardTitle>
-        <CardDescription>24-hour trend showing active power consumption and system efficiency</CardDescription>
+        <CardTitle>Power Flow & Power Factor</CardTitle>
+        <CardDescription>24-hour trend showing active power consumption and power factor</CardDescription>
       </CardHeader>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -195,7 +205,7 @@ const PowerFlowChart = ({ metrics = {} }) => {
               <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
               <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
             </linearGradient>
-            <linearGradient id="colorEfficiency" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="colorPowerFactor" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#f65c5cff" stopOpacity={0.3}/>
               <stop offset="95%" stopColor="#f65c5cff" stopOpacity={0}/>
             </linearGradient>
@@ -227,11 +237,11 @@ const PowerFlowChart = ({ metrics = {} }) => {
           />
           <Area
             type="monotone"
-            dataKey="efficiency"
+            dataKey="powerFactor"
             stroke="#f65c5cff"
             strokeWidth={2}
-            fill="url(#colorEfficiency)"
-            name="Efficiency (%)"
+            fill="url(#colorPowerFactor)"
+            name="Power Factor (%)"
           />
         </AreaChart>
       </ResponsiveContainer>

@@ -143,10 +143,11 @@ const Trends = () => {
 
         // Format data for charts
         const formattedPowerData = influxData.map(point => ({
-          time: new Date(point.timestamp).toLocaleTimeString('en-US', {
+          time: new Date(point.timestamp).toLocaleTimeString('en-IN', {
             hour: '2-digit',
             minute: '2-digit',
-            hour12: false
+            hour12: false,
+            timeZone: 'Asia/Kolkata'
           }),
           activePower: point.active_power || 0,
           reactivePower: point.reactive_power || 0,
@@ -155,10 +156,11 @@ const Trends = () => {
         }));
 
         const formattedVoltageData = influxData.map(point => ({
-          time: new Date(point.timestamp).toLocaleTimeString('en-US', {
+          time: new Date(point.timestamp).toLocaleTimeString('en-IN', {
             hour: '2-digit',
             minute: '2-digit',
-            hour12: false
+            hour12: false,
+            timeZone: 'Asia/Kolkata'
           }),
           voltage400kv: point.voltage_400kv || 400,
           voltage220kv: point.voltage_220kv || 220,
