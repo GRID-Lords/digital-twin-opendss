@@ -19,6 +19,7 @@ except ImportError:
 
 from src.config import Config
 from src.database import db
+from src.influx_manager import influxdb_manager
 
 logger = logging.getLogger(__name__)
 
@@ -111,16 +112,19 @@ class DataManager:
     async def buffer_metrics(self, metrics: Dict[str, Any]):
         """
         Buffer metrics for batch storage
-        Only store to database periodically for analysis
+        Also immediately write to InfluxDB for real-time timeseries
         """
         try:
-            # Add to buffer
+            # Write to InfluxDB immediately for real-time timeseries data
+            influxdb_manager.write_metrics(metrics)
+
+            # Add to buffer for PostgreSQL batch storage
             self.metrics_buffer.append({
                 **metrics,
                 'buffered_at': time.time()
             })
 
-            # Check if it's time to persist to database
+            # Check if it's time to persist to PostgreSQL
             current_time = time.time()
             time_since_last_storage = current_time - self.last_storage_time
 
@@ -143,15 +147,20 @@ class DataManager:
                 # Aggregate metrics
                 aggregated = self._aggregate_metrics(batch_data)
 
-                # Store aggregated metrics for analysis
+                # Store aggregated metrics to PostgreSQL for analysis
                 db.store_metrics(aggregated)
 
-                # Store detailed metrics only if significant events occurred
+                # Store detailed metrics to InfluxDB for timeseries analysis
+                influx_success_count = 0
                 for metric in batch_data:
+                    if influxdb_manager.write_metrics(metric):
+                        influx_success_count += 1
+
+                    # Also store significant events to PostgreSQL
                     if self._is_significant_event(metric):
                         db.store_metrics(metric)
 
-                logger.info(f"Persisted {len(batch_data)} metrics to database")
+                logger.info(f"Persisted {len(batch_data)} metrics to PostgreSQL, {influx_success_count} to InfluxDB")
 
                 # Clear buffer and update timestamp
                 self.metrics_buffer.clear()
