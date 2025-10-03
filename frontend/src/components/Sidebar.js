@@ -8,6 +8,7 @@ import {
   BarChart3,
   Monitor,
   FileText,
+  TrendingUp,
   Menu,
   X
 } from 'lucide-react';
@@ -111,6 +112,7 @@ const Sidebar = ({ isOpen, onToggle }) => {
     { path: '/scada', icon: Activity, label: 'SCADA' },
     { path: '/analytics', icon: BarChart3, label: 'Analytics' },
     { path: '/visualization', icon: Monitor, label: 'Visualization' },
+    { path: '/trends', icon: TrendingUp, label: 'Trends' },
     { path: '/logging', icon: FileText, label: 'Logging' },
   ];
 

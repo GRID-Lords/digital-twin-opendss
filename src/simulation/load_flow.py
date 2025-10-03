@@ -12,6 +12,53 @@ class LoadFlowAnalysis:
         self.circuit = None
         self.dss = None
         self.results = {}
+        self.base_load_mw = 420  # Base load for Indian EHV substation
+
+    def apply_realistic_load_pattern(self):
+        """Apply realistic seasonal and daily load patterns to OpenDSS circuit"""
+        if not self.dss or not self.circuit:
+            return
+
+        from datetime import datetime
+        now = datetime.now()
+        hour = now.hour
+        month = now.month
+
+        # ==== SEASONAL VARIATIONS (Indian Climate) ====
+        if 3 <= month <= 6:  # Summer
+            seasonal_factor = 1.15
+        elif 7 <= month <= 9:  # Monsoon
+            seasonal_factor = 1.0
+        elif month >= 11 or month <= 2:  # Winter
+            seasonal_factor = 0.85
+        else:  # Autumn
+            seasonal_factor = 0.95
+
+        # ==== DAILY LOAD PATTERN ====
+        if 6 <= hour < 9:  # Morning peak
+            daily_factor = 0.85 + (hour - 6) * 0.05
+        elif 9 <= hour < 10:
+            daily_factor = 0.95
+        elif 10 <= hour < 14:  # Midday peak
+            daily_factor = 0.95 + (12 - abs(hour - 12)) * 0.05
+        elif 14 <= hour < 17:
+            daily_factor = 0.90
+        elif 17 <= hour < 22:  # Evening peak
+            daily_factor = 1.0 + (20 - abs(hour - 20)) * 0.05
+        elif 22 <= hour < 24:
+            daily_factor = 0.70 - (hour - 22) * 0.05
+        else:  # Night valley
+            daily_factor = 0.50 + hour * 0.02
+
+        # Combined load factor
+        load_factor = seasonal_factor * daily_factor
+
+        try:
+            # Apply load factor to all loads in circuit
+            self.dss.text(f"set loadmult={load_factor}")
+            logger.info(f"Applied load pattern: seasonal={seasonal_factor:.2f}, daily={daily_factor:.2f}, total={load_factor:.2f}")
+        except Exception as e:
+            logger.warning(f"Could not apply load pattern: {e}")
 
     def load_circuit(self, dss_file: str):
         """Load circuit from DSS file using OpenDSS"""
@@ -49,6 +96,9 @@ class LoadFlowAnalysis:
             }
 
         try:
+            # Apply realistic load patterns before solving
+            self.apply_realistic_load_pattern()
+
             # Solve the power flow
             self.dss.text("solve")
 

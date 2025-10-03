@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: digitaltwin
       POSTGRES_USER: digitaltwin
-      POSTGRES_PASSWORD: DT2024$ecure!
+      POSTGRES_PASSWORD: DT2024SecurePass
     ports:
       - "5432:5432"
     volumes:
@@ -45,7 +45,7 @@ services:
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: admin
-      DOCKER_INFLUXDB_INIT_PASSWORD: DT2024$ecure!
+      DOCKER_INFLUXDB_INIT_PASSWORD: DT2024SecurePass
       DOCKER_INFLUXDB_INIT_ORG: digitaltwin
       DOCKER_INFLUXDB_INIT_BUCKET: metrics
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: dt-super-secret-auth-token-2024

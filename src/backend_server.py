@@ -102,6 +102,11 @@ async def startup_event():
     try:
         logger.info("Initializing Digital Twin Backend...")
 
+        # Initialize database tables
+        logger.info("Initializing database tables...")
+        db.init_database()
+        logger.info("Database tables ready")
+
         # Initialize Asset Manager
         asset_manager = SubstationAssetManager()
         logger.info(f"Asset Manager initialized with {len(asset_manager.assets)} assets")

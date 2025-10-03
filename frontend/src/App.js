@@ -10,6 +10,7 @@ import Analytics from './pages/Analytics';
 import AnomalyDetail from './pages/AnomalyDetail';
 import Visualization from './pages/Visualization';
 import Logging from './pages/Logging';
+import Trends from './pages/Trends';
 import { DigitalTwinProvider } from './context/DigitalTwinContext';
 
 const GlobalStyle = createGlobalStyle`
@@ -144,6 +145,7 @@ function App() {
                 <Route path="/analytics/:id" element={<AnomalyDetail />} />
                 <Route path="/visualization" element={<Visualization />} />
                 <Route path="/logging" element={<Logging />} />
+                <Route path="/trends" element={<Trends />} />
               </Routes>
             </Content>
           </MainContent>

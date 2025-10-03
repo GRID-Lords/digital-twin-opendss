@@ -595,3 +595,242 @@ async def get_metric_trends(
         "metrics": requested_metrics,
         "data": trends
     }
+
+@router.get("/timeseries/power-flow")
+async def get_timeseries_power_flow(
+    time_range: str = Query("1h", description="Time range (1h, 6h, 24h, 7d)", alias="range"),
+    resolution: str = Query("1m", description="Data resolution (1m, 5m, 15m)"),
+    data_manager = Depends(get_data_manager)
+):
+    """Get high-resolution InfluxDB time-series data for Trends page"""
+
+    # Parse time range
+    range_mapping = {
+        "1h": 60,
+        "6h": 360,
+        "24h": 1440,
+        "7d": 10080
+    }
+
+    minutes = range_mapping.get(time_range, 60)
+
+    # Use IST timezone (UTC+5:30)
+    from datetime import timezone
+    IST = timezone(timedelta(hours=5, minutes=30))
+
+    end_time = datetime.now(IST)
+    start_time = end_time - timedelta(minutes=minutes)
+
+    # Try to get data from InfluxDB first
+    try:
+        from timeseries_db import timeseries_db
+        db_data = timeseries_db.get_power_flow_history(
+            start_time.replace(tzinfo=None),
+            end_time.replace(tzinfo=None)
+        )
+
+        if db_data and len(db_data) > 0:
+            # Format InfluxDB data for frontend
+            data_points = []
+            for record in db_data:
+                ts = datetime.fromisoformat(str(record['timestamp']))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=IST)
+
+                data_points.append({
+                    "timestamp": ts.isoformat(),
+                    "active_power": round(record.get('active_power', 0), 2),
+                    "reactive_power": round(record.get('reactive_power', 0), 2),
+                    "apparent_power": round(record.get('apparent_power', 0), 2),
+                    "power_factor": round(record.get('power_factor', 0.95), 3),
+                    "voltage_400kv": round(record.get('voltage_400kv', 400), 2),
+                    "voltage_220kv": round(record.get('voltage_220kv', 220), 2),
+                    "frequency": round(record.get('frequency', 50.0), 2)
+                })
+
+            logger.info(f"Returning {len(data_points)} InfluxDB timeseries records")
+
+            return {
+                "start": start_time.isoformat(),
+                "end": end_time.isoformat(),
+                "range": time_range,
+                "resolution": resolution,
+                "source": "influxdb",
+                "data": data_points
+            }
+    except Exception as e:
+        logger.warning(f"InfluxDB not available, generating fallback data: {e}")
+
+    # Fallback: Try PostgreSQL database before generating synthetic data
+    try:
+        from src.database import db
+        pg_data = db.get_metrics_history(hours=int(minutes/60) if minutes < 1440 else 24, limit=1000)
+
+        if pg_data and len(pg_data) > 0:
+            logger.info(f"Found {len(pg_data)} records in PostgreSQL, using real data")
+
+            # Format PostgreSQL data for frontend
+            data_points = []
+            for record in pg_data:
+                ts_str = record.get('timestamp')
+                if isinstance(ts_str, str):
+                    ts = datetime.fromisoformat(ts_str)
+                else:
+                    ts = ts_str
+
+                # Add IST timezone if needed
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=IST)
+
+                # Parse data JSON if it exists
+                data_json = record.get('data')
+                if isinstance(data_json, str):
+                    import json
+                    try:
+                        data_dict = json.loads(data_json)
+                    except:
+                        data_dict = {}
+                else:
+                    data_dict = data_json or {}
+
+                data_points.append({
+                    "timestamp": ts.isoformat(),
+                    "active_power": round(record.get('total_power', 0), 2),
+                    "reactive_power": round(record.get('total_power', 0) * 0.28, 2),
+                    "apparent_power": round(record.get('total_power', 0) * 1.04, 2),
+                    "power_factor": round(record.get('power_factor', 0.96), 3),
+                    "voltage_400kv": round(data_dict.get('voltage_400kv', 400), 2),
+                    "voltage_220kv": round(data_dict.get('voltage_220kv', 220), 2),
+                    "frequency": round(data_dict.get('frequency', 50.0), 2)
+                })
+
+            if len(data_points) > 0:
+                # Sort by timestamp
+                data_points.sort(key=lambda x: x['timestamp'])
+
+                return {
+                    "start": start_time.isoformat(),
+                    "end": end_time.isoformat(),
+                    "range": time_range,
+                    "resolution": resolution,
+                    "source": "postgresql",
+                    "data": data_points[-max_points:] if len(data_points) > 1000 else data_points
+                }
+
+    except Exception as db_error:
+        logger.warning(f"Could not read from PostgreSQL: {db_error}")
+
+    # Last resort: Generate realistic synthetic data
+    # This uses OpenDSS-style calculations matching what real data would look like
+    logger.info("Generating synthetic data with realistic patterns (no database available)")
+
+    resolution_minutes = 1 if resolution == "1m" else 5 if resolution == "5m" else 15
+    max_points = min(minutes // resolution_minutes, 1000)
+
+    timestamps = []
+    current = start_time
+    delta = timedelta(minutes=resolution_minutes)
+
+    for i in range(max_points):
+        if current > end_time:
+            break
+        timestamps.append(current)
+        current += delta
+
+    # Base values from typical Indian EHV substation operation (matching OpenDSS circuit)
+    base_load = 420  # MW (medium-sized substation)
+
+    data_points = []
+    for i, ts in enumerate(timestamps):
+        hour = ts.hour
+        month = ts.month
+
+        # ==== SEASONAL VARIATIONS (Indian Climate) ====
+        # Summer (Mar-Jun): Peak AC load
+        if 3 <= month <= 6:
+            seasonal_factor = 1.15  # 15% higher load due to cooling
+            base_voltage_400 = 397  # Voltage sags during high load
+            base_voltage_220 = 218
+        # Monsoon (Jul-Sep): Moderate load
+        elif 7 <= month <= 9:
+            seasonal_factor = 1.0  # Normal load
+            base_voltage_400 = 400
+            base_voltage_220 = 220
+        # Winter (Nov-Feb): Lower load
+        elif month >= 11 or month <= 2:
+            seasonal_factor = 0.85  # 15% lower load, minimal heating
+            base_voltage_400 = 403  # Voltage rises during low load
+            base_voltage_220 = 222
+        # Autumn (Oct): Transition
+        else:
+            seasonal_factor = 0.95
+            base_voltage_400 = 401
+            base_voltage_220 = 221
+
+        # ==== DAILY LOAD PATTERN (Indian Substation) ====
+        # Morning peak (6-9 AM): 80-90% load (offices/industries start)
+        if 6 <= hour < 9:
+            daily_factor = 0.85 + (hour - 6) * 0.05  # Gradual rise
+        # Mid-morning (9-10 AM): Building up
+        elif 9 <= hour < 10:
+            daily_factor = 0.95
+        # Midday peak (10-14): 90-100% load (full industrial/commercial)
+        elif 10 <= hour < 14:
+            daily_factor = 0.95 + (12 - abs(hour - 12)) * 0.05  # Peak at noon
+        # Afternoon (14-17): Slight dip
+        elif 14 <= hour < 17:
+            daily_factor = 0.90
+        # Evening peak (17-22): 100-110% load (residential + commercial)
+        elif 17 <= hour < 22:
+            daily_factor = 1.0 + (20 - abs(hour - 20)) * 0.05  # Peak at 8 PM
+        # Late night (22-24): Declining
+        elif 22 <= hour < 24:
+            daily_factor = 0.70 - (hour - 22) * 0.05
+        # Night valley (0-6 AM): 40-60% load
+        else:
+            daily_factor = 0.50 + hour * 0.02
+
+        # Combine seasonal and daily factors
+        load_factor = seasonal_factor * daily_factor
+
+        # Deterministic variations based on timestamp hash (small random-like variations)
+        minute_hash = hash(ts.isoformat()) % 100 / 50.0 - 1.0  # Range: -1 to 1
+
+        # Calculate power values
+        active_power = base_load * load_factor + minute_hash * 8
+        reactive_power = active_power * 0.28 + minute_hash * 4  # Typical PF ~0.96
+        apparent_power = (active_power**2 + reactive_power**2) ** 0.5
+        power_factor = active_power / apparent_power if apparent_power > 0 else 0.96
+
+        # ==== VOLTAGE VARIATIONS ====
+        # Voltage inversely related to load (voltage drop during high load)
+        load_effect = (1 - load_factor) * 3  # Higher load = lower voltage
+        voltage_400kv = base_voltage_400 + load_effect + minute_hash * 2
+        voltage_220kv = base_voltage_220 + load_effect * 0.55 + minute_hash * 1.2
+
+        # Ensure voltages stay within Indian Grid Code limits (±5%)
+        voltage_400kv = max(380, min(420, voltage_400kv))
+        voltage_220kv = max(209, min(231, voltage_220kv))
+
+        # Frequency: Indian grid is quite stable (49.9-50.05 Hz typical)
+        frequency = 50.0 + minute_hash * 0.03
+
+        data_points.append({
+            "timestamp": ts.isoformat(),
+            "active_power": round(active_power, 2),
+            "reactive_power": round(reactive_power, 2),
+            "apparent_power": round(apparent_power, 2),
+            "power_factor": round(power_factor, 3),
+            "voltage_400kv": round(voltage_400kv, 2),
+            "voltage_220kv": round(voltage_220kv, 2),
+            "frequency": round(frequency, 2)
+        })
+
+    return {
+        "start": start_time.isoformat(),
+        "end": end_time.isoformat(),
+        "range": time_range,
+        "resolution": resolution,
+        "source": "fallback",
+        "data": data_points
+    }

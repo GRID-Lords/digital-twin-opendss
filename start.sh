@@ -126,7 +126,8 @@ start_local() {
     echo -e "${BLUE}[2/5] Installing dependencies...${NC}"
     pip install -q --upgrade pip
     pip install -q fastapi uvicorn websockets pandas numpy scikit-learn matplotlib \
-        httpx python-multipart aiofiles py-dss-interface pymodbus python-dotenv redis 2>/dev/null || true
+        httpx python-multipart aiofiles py-dss-interface pymodbus python-dotenv redis \
+        psycopg2-binary influxdb-client 2>/dev/null || true
     echo -e "${GREEN}✓ Dependencies installed${NC}"
 
     # Step 3: Train AI models if needed
