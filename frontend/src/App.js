@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Assets from './pages/Assets';
 import SCADA from './pages/SCADA';
 import Analytics from './pages/Analytics';
+import AnomalyDetail from './pages/AnomalyDetail';
 import Visualization from './pages/Visualization';
 import Logging from './pages/Logging';
 import { DigitalTwinProvider } from './context/DigitalTwinContext';
@@ -140,6 +141,7 @@ function App() {
                 <Route path="/assets" element={<Assets />} />
                 <Route path="/scada" element={<SCADA />} />
                 <Route path="/analytics" element={<Analytics />} />
+                <Route path="/analytics/:id" element={<AnomalyDetail />} />
                 <Route path="/visualization" element={<Visualization />} />
                 <Route path="/logging" element={<Logging />} />
               </Routes>

@@ -35,7 +35,11 @@ def get_simulator():
     """Get or create anomaly simulator instance"""
     global anomaly_simulator
     if anomaly_simulator is None:
-        anomaly_simulator = OpenDSSAnomalySimulator("ehv_substation.dss")
+        # Use the correct DSS file path
+        dss_file = Path(__file__).parent.parent / "models" / "IndianEHVSubstation.dss"
+        if not dss_file.exists():
+            raise FileNotFoundError(f"DSS file not found: {dss_file}")
+        anomaly_simulator = OpenDSSAnomalySimulator(str(dss_file))
     return anomaly_simulator
 
 # Request models
