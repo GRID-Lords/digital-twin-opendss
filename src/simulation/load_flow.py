@@ -55,7 +55,7 @@ class LoadFlowAnalysis:
 
         try:
             # Apply load factor to all loads in circuit
-            self.dss.text(f"set loadmult={load_factor}")
+            self.dss.Text.Command(f"set loadmult={load_factor}")
             logger.info(f"Applied load pattern: seasonal={seasonal_factor:.2f}, daily={daily_factor:.2f}, total={load_factor:.2f}")
         except Exception as e:
             logger.warning(f"Could not apply load pattern: {e}")
@@ -63,25 +63,26 @@ class LoadFlowAnalysis:
     def load_circuit(self, dss_file: str):
         """Load circuit from DSS file using OpenDSS"""
         try:
-            from py_dss_interface import DSS
-            self.dss = DSS()
+            import opendssdirect as dss
+            self.dss = dss
+            self._dss_file = dss_file  # Store for re-activation
 
             # Compile the DSS file
-            self.dss.text(f"compile [{dss_file}]")
+            dss.Text.Command(f"compile [{dss_file}]")
 
-            # Get circuit interface
-            self.circuit = self.dss.circuit
+            # Store circuit reference
+            self.circuit = dss.Circuit
 
             logger.info(f"Successfully loaded OpenDSS circuit from {dss_file}")
             return True
         except Exception as e:
             logger.error(f"Error loading circuit: {e}")
-            self.circuit = {"file": dss_file, "loaded": False}
+            self.circuit = None
             return False
 
     def solve(self) -> Dict[str, Any]:
         """Run load flow analysis using actual OpenDSS"""
-        if not self.dss or not self.circuit:
+        if not self.dss:
             # Return fallback values if OpenDSS not initialized
             logger.warning("OpenDSS not initialized, returning fallback values")
             return {
@@ -96,48 +97,62 @@ class LoadFlowAnalysis:
             }
 
         try:
+            # Recompile circuit to ensure it's active (opendssdirect loses context)
+            if hasattr(self, '_dss_file') and self._dss_file:
+                self.dss.Text.Command(f"compile [{self._dss_file}]")
+                # Must recalculate voltage bases after recompile
+                self.dss.Text.Command("CalcVoltageBases")
+
             # Apply realistic load patterns before solving
-            self.apply_realistic_load_pattern()
+            # TEMPORARILY DISABLED to test
+            # self.apply_realistic_load_pattern()
 
             # Solve the power flow
-            self.dss.text("solve")
+            self.dss.Text.Command("solve")
+            logger.info(f"Solve converged: {self.dss.Solution.Converged()}")
 
             # Check if solution converged
-            converged = self.circuit.solution.converged()
-            iterations = self.circuit.solution.iterations()
+            converged = self.dss.Solution.Converged()
+            iterations = self.dss.Solution.Iterations()
 
             # Get voltage profile
             voltages_pu = []
             voltage_400kv = 400.0
             voltage_220kv = 220.0
 
-            bus_names = self.circuit.buses_names()
+            bus_names = self.dss.Circuit.AllBusNames()
+            logger.info(f"Found {len(bus_names)} buses in circuit")
+
             for bus_name in bus_names:
-                self.circuit.set_active_bus(bus_name)
-                v_pu = self.circuit.buses.pu_vmag_angle()
+                self.dss.Circuit.SetActiveBus(bus_name)
+                v_pu = self.dss.Bus.puVmagAngle()
                 if v_pu and len(v_pu) > 0:
                     voltages_pu.append(v_pu[0])  # Magnitude
 
                     # Get actual kV value
-                    kv_base = self.circuit.buses.kv_base()
+                    kv_base = self.dss.Bus.kVBase()
                     kv_actual = v_pu[0] * kv_base
 
                     # Categorize by voltage level
                     if kv_base > 300:  # 400kV bus
                         voltage_400kv = kv_actual
+                        logger.info(f"400kV bus: {bus_name}, kv_base={kv_base:.2f}, v_pu={v_pu[0]:.4f}, kv_actual={kv_actual:.2f}")
                     elif kv_base > 100:  # 220kV bus
                         voltage_220kv = kv_actual
+                        logger.info(f"220kV bus: {bus_name}, kv_base={kv_base:.2f}, v_pu={v_pu[0]:.4f}, kv_actual={kv_actual:.2f}")
 
             max_voltage_pu = max(voltages_pu) if voltages_pu else 1.0
             min_voltage_pu = min(voltages_pu) if voltages_pu else 1.0
 
-            # Get total losses
-            total_losses_kw = self.circuit.losses()[0]  # Real losses in kW
-            total_losses_mw = total_losses_kw / 1000.0
+            # Get total losses (OpenDSS Circuit.Losses() returns in W)
+            losses = self.dss.Circuit.Losses()
+            total_losses_kw = abs(losses[0]) / 1000  # Convert W to kW
+            total_losses_mw = total_losses_kw / 1000.0  # Convert kW to MW
 
             # Get power factor
-            total_power_kw = self.circuit.total_power()[0]  # Real power
-            total_power_kvar = self.circuit.total_power()[1]  # Reactive power
+            total_power = self.dss.Circuit.TotalPower()
+            total_power_kw = total_power[0]  # Real power
+            total_power_kvar = total_power[1]  # Reactive power
 
             if total_power_kw != 0:
                 apparent_power = np.sqrt(total_power_kw**2 + total_power_kvar**2)
@@ -145,7 +160,7 @@ class LoadFlowAnalysis:
             else:
                 power_factor = 0.95
 
-            return {
+            result = {
                 "converged": converged,
                 "iterations": iterations,
                 "max_voltage_pu": max_voltage_pu,
@@ -157,6 +172,8 @@ class LoadFlowAnalysis:
                 "total_power_kw": total_power_kw,
                 "total_power_kvar": total_power_kvar
             }
+            logger.info(f"OpenDSS solved: converged={converged}, total_power_kw={total_power_kw:.2f}, v400={voltage_400kv:.2f}, v220={voltage_220kv:.2f}")
+            return result
         except Exception as e:
             logger.error(f"Error solving load flow: {e}")
             # Return safe fallback values
