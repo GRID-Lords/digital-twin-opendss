@@ -134,7 +134,7 @@ const Trends = () => {
       const response = await axios.get(`/api/historical/timeseries/power-flow`, {
         params: {
           range: timeRange,
-          resolution: '1m' // 1-minute resolution from InfluxDB
+          resolution: '5m' // 5-minute resolution from InfluxDB
         }
       });
 

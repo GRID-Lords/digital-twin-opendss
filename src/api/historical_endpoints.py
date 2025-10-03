@@ -623,32 +623,108 @@ async def get_timeseries_power_flow(
 
     # Try to get data from InfluxDB first
     try:
-        from timeseries_db import timeseries_db
-        db_data = timeseries_db.get_power_flow_history(
-            start_time.replace(tzinfo=None),
-            end_time.replace(tzinfo=None)
-        )
+        from src.influx_manager import influxdb_manager
+        from src.data_manager import data_manager
+
+        # Query InfluxDB for system_metrics in the time range
+        if not influxdb_manager.client:
+            raise Exception("InfluxDB not connected")
+
+        hours_ago = int((datetime.now(IST) - start_time).total_seconds() / 3600) + 1
+        db_data = influxdb_manager.query_metrics("system_metrics", hours=hours_ago)
+
+        # Get current metrics from Redis for real-time values
+        current_metrics = await data_manager.get_realtime_data("current_metrics")
 
         if db_data and len(db_data) > 0:
-            # Format InfluxDB data for frontend
-            data_points = []
-            for record in db_data:
-                ts = datetime.fromisoformat(str(record['timestamp']))
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=IST)
+            # InfluxDB returns records like: {'time': datetime, 'field': 'total_power_mw', 'value': 123.45, ...}
+            # Group by timestamp to create combined data points
+            from collections import defaultdict
+            grouped_data = defaultdict(dict)
 
-                data_points.append({
-                    "timestamp": ts.isoformat(),
-                    "active_power": round(record.get('active_power', 0), 2),
-                    "reactive_power": round(record.get('reactive_power', 0), 2),
-                    "apparent_power": round(record.get('apparent_power', 0), 2),
-                    "power_factor": round(record.get('power_factor', 0.95), 3),
-                    "voltage_400kv": round(record.get('voltage_400kv', 400), 2),
-                    "voltage_220kv": round(record.get('voltage_220kv', 220), 2),
-                    "frequency": round(record.get('frequency', 50.0), 2)
+            for record in db_data:
+                ts = record.get('time')
+                if ts:
+                    # Convert to IST
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=IST)
+                    ts_key = ts.isoformat()
+
+                    field = record.get('field', record.get('_field'))
+                    value = record.get('value', record.get('_value', 0))
+
+                    if not grouped_data[ts_key]:
+                        grouped_data[ts_key]['timestamp'] = ts_key
+
+                    # Map InfluxDB field names to frontend expected names
+                    if field == 'total_power_mw':
+                        grouped_data[ts_key]['active_power'] = value
+                        grouped_data[ts_key]['reactive_power'] = value * 0.28  # Approximate from PF
+                        grouped_data[ts_key]['apparent_power'] = value * 1.04  # Approximate
+                    elif field == 'power_factor':
+                        grouped_data[ts_key]['power_factor'] = value
+                    elif field == 'voltage_400kv':
+                        grouped_data[ts_key]['voltage_400kv'] = value
+                    elif field == 'voltage_220kv':
+                        grouped_data[ts_key]['voltage_220kv'] = value
+                    elif field == 'frequency_hz':
+                        grouped_data[ts_key]['frequency'] = value
+
+            # Convert to list and fill in defaults
+            all_points = []
+            for ts_key in sorted(grouped_data.keys()):
+                point = grouped_data[ts_key]
+
+                # Use real power from current metrics if available, otherwise use stored value
+                active_power = point.get('active_power', 0)
+                if active_power == 0 and current_metrics:
+                    active_power = current_metrics.get('total_power', 0)
+
+                all_points.append({
+                    "timestamp": point.get('timestamp'),
+                    "active_power": round(active_power, 2),
+                    "reactive_power": round(point.get('reactive_power', active_power * 0.28), 2),
+                    "apparent_power": round(point.get('apparent_power', active_power * 1.04), 2),
+                    "power_factor": round(point.get('power_factor', 0.95), 3),
+                    "voltage_400kv": round(point.get('voltage_400kv', 400), 2),
+                    "voltage_220kv": round(point.get('voltage_220kv', 220), 2),
+                    "frequency": round(point.get('frequency', 50.0), 2)
                 })
 
-            logger.info(f"Returning {len(data_points)} InfluxDB timeseries records")
+            # Downsample based on resolution parameter
+            resolution_minutes = 1 if resolution == "1m" else 5 if resolution == "5m" else 15
+            data_points = []
+
+            if resolution_minutes > 1 and len(all_points) > 0:
+                # Group by resolution intervals and average
+                interval_groups = {}
+                for point in all_points:
+                    ts = datetime.fromisoformat(point['timestamp'].replace('+00:00', ''))
+                    # Round down to nearest interval
+                    interval_ts = ts.replace(minute=(ts.minute // resolution_minutes) * resolution_minutes, second=0, microsecond=0)
+                    interval_key = interval_ts.isoformat()
+
+                    if interval_key not in interval_groups:
+                        interval_groups[interval_key] = []
+                    interval_groups[interval_key].append(point)
+
+                # Average each interval group
+                for interval_ts in sorted(interval_groups.keys()):
+                    points_in_interval = interval_groups[interval_ts]
+                    data_points.append({
+                        "timestamp": interval_ts + '+05:30',  # Add IST timezone
+                        "active_power": round(sum(p['active_power'] for p in points_in_interval) / len(points_in_interval), 2),
+                        "reactive_power": round(sum(p['reactive_power'] for p in points_in_interval) / len(points_in_interval), 2),
+                        "apparent_power": round(sum(p['apparent_power'] for p in points_in_interval) / len(points_in_interval), 2),
+                        "power_factor": round(sum(p['power_factor'] for p in points_in_interval) / len(points_in_interval), 3),
+                        "voltage_400kv": round(sum(p['voltage_400kv'] for p in points_in_interval) / len(points_in_interval), 2),
+                        "voltage_220kv": round(sum(p['voltage_220kv'] for p in points_in_interval) / len(points_in_interval), 2),
+                        "frequency": round(sum(p['frequency'] for p in points_in_interval) / len(points_in_interval), 2)
+                    })
+            else:
+                data_points = all_points
+
+            logger.info(f"Returning {len(data_points)} InfluxDB timeseries records (downsampled from {len(all_points)} to {resolution})")
 
             return {
                 "start": start_time.isoformat(),
@@ -722,7 +798,7 @@ async def get_timeseries_power_flow(
 
     # Last resort: Generate realistic synthetic data
     # This uses OpenDSS-style calculations matching what real data would look like
-    logger.info("Generating synthetic data with realistic patterns (no database available)")
+    logger.info(f"Generating synthetic data with realistic patterns for {time_range} @ {resolution} resolution")
 
     resolution_minutes = 1 if resolution == "1m" else 5 if resolution == "5m" else 15
     max_points = min(minutes // resolution_minutes, 1000)

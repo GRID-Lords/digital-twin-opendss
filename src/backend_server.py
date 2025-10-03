@@ -422,14 +422,14 @@ async def run_opendss_and_update_assets():
             logger.warning("OpenDSS power flow did not converge")
             return flow_results
 
-        # Update assets with OpenDSS results
-        if asset_manager and load_flow.circuit:
+        # Update assets with OpenDSS results (using opendssdirect API)
+        if asset_manager and load_flow.dss:
             # Get bus voltages
-            bus_names = load_flow.circuit.buses_names()
+            bus_names = load_flow.dss.Circuit.AllBusNames()
             for bus_name in bus_names:
-                load_flow.circuit.set_active_bus(bus_name)
-                v_pu = load_flow.circuit.buses.pu_vmag_angle()
-                kv_base = load_flow.circuit.buses.kv_base()
+                load_flow.dss.Circuit.SetActiveBus(bus_name)
+                v_pu = load_flow.dss.Bus.puVmagAngle()
+                kv_base = load_flow.dss.Bus.kVBase()
 
                 if v_pu and len(v_pu) > 0:
                     kv_actual = v_pu[0] * kv_base
@@ -440,12 +440,12 @@ async def run_opendss_and_update_assets():
                             asset.real_time_data['voltage_kv'] = kv_actual
 
             # Get line/transformer currents and loadings
-            element_names = load_flow.circuit.allElement_names()
+            element_names = load_flow.dss.Circuit.AllElementNames()
             for elem_name in element_names:
                 if 'transformer' in elem_name.lower():
-                    load_flow.circuit.set_active_element(elem_name)
-                    currents = load_flow.circuit.cktelement.currents()
-                    powers = load_flow.circuit.cktelement.powers()
+                    load_flow.dss.Circuit.SetActiveElement(elem_name)
+                    currents = load_flow.dss.CktElement.Currents()
+                    powers = load_flow.dss.CktElement.Powers()
 
                     # Find matching asset
                     for asset_id, asset in asset_manager.assets.items():
@@ -454,10 +454,11 @@ async def run_opendss_and_update_assets():
                                 asset.real_time_data['current_a'] = abs(currents[0])
                             if powers and len(powers) > 0:
                                 asset.real_time_data['power_mw'] = abs(powers[0]) / 1000
-                                # Calculate loading percentage
-                                rated_power = asset.electrical.rated_power_mva * 1000  # Convert to kW
-                                loading_pct = (abs(powers[0]) / rated_power) * 100
-                                asset.real_time_data['loading_percent'] = min(100, loading_pct)
+                                # Calculate loading percentage if rated power available
+                                if hasattr(asset.electrical, 'rated_power_mva') and asset.electrical.rated_power_mva:
+                                    rated_power = asset.electrical.rated_power_mva * 1000  # Convert to kW
+                                    loading_pct = (abs(powers[0]) / rated_power) * 100
+                                    asset.real_time_data['loading_percent'] = min(100, loading_pct)
 
         return flow_results
 
@@ -499,12 +500,17 @@ async def get_current_metrics():
         system_health = 95
 
     # Use OpenDSS results from flow_results
+    voltage_400kv = 0
+    voltage_220kv = 0
     if flow_results:
         power_factor = flow_results.get('power_factor', 0.95)
         losses_mw = flow_results.get('total_losses_mw', total_power * 0.03)
         total_power_kw = flow_results.get('total_power_kw', 0)
-        if total_power_kw > 0:
-            total_power = total_power_kw / 1000  # Convert kW to MW
+        voltage_400kv = flow_results.get('voltage_400kv', 0)
+        voltage_220kv = flow_results.get('voltage_220kv', 0)
+        if total_power_kw != 0:
+            # Use absolute value (negative means source power in OpenDSS)
+            total_power = abs(total_power_kw) / 1000  # Convert kW to MW
     else:
         power_factor = 0.95
         losses_mw = total_power * 0.03
@@ -535,6 +541,8 @@ async def get_current_metrics():
         "active_power": round(active_power, 2),
         "reactive_power": round(reactive_power, 2),
         "apparent_power": round(apparent_power, 2),
+        "voltage_400kv": round(voltage_400kv, 2),  # From OpenDSS
+        "voltage_220kv": round(voltage_220kv, 2),  # From OpenDSS
         "alerts": [],
         "predictions": {}
     }
