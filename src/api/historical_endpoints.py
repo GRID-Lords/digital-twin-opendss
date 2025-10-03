@@ -150,9 +150,10 @@ async def get_power_flow_history(
         else:
             load_factor = 0.6
 
-        # Add some randomness
-        active_power = base_load * load_factor + np.random.normal(0, 10)
-        reactive_power = active_power * 0.3 + np.random.normal(0, 5)
+        # Use deterministic variation based on timestamp
+        minute_hash = hash(ts.isoformat()) % 100 / 50.0 - 1.0  # Deterministic [-1, 1]
+        active_power = base_load * load_factor + minute_hash * 10
+        reactive_power = active_power * 0.3
 
         # Calculate power factor
         apparent_power = np.sqrt(active_power**2 + reactive_power**2)
@@ -218,10 +219,11 @@ async def get_voltage_profile_history(
         else:
             voltage_pu = 1.01  # Slightly above nominal during off-peak
 
-        # Add realistic variations for each phase
-        phase_a = nominal_voltage * voltage_pu + np.random.normal(0, 0.5)
-        phase_b = nominal_voltage * voltage_pu + np.random.normal(0, 0.5)
-        phase_c = nominal_voltage * voltage_pu + np.random.normal(0, 0.5)
+        # Use deterministic phase variations based on timestamp
+        time_hash = hash(ts.isoformat())
+        phase_a = nominal_voltage * voltage_pu + (time_hash % 10 - 5) * 0.1
+        phase_b = nominal_voltage * voltage_pu + ((time_hash // 10) % 10 - 5) * 0.1
+        phase_c = nominal_voltage * voltage_pu + ((time_hash // 100) % 10 - 5) * 0.1
 
         # Calculate imbalance
         avg_voltage = (phase_a + phase_b + phase_c) / 3
@@ -235,7 +237,7 @@ async def get_voltage_profile_history(
             "phaseC": round(phase_c, 2),
             "average": round(avg_voltage, 2),
             "imbalance": round(imbalance, 3),
-            "frequency": round(50 + np.random.normal(0, 0.02), 3)
+            "frequency": round(50.0 + (time_hash % 5 - 2.5) * 0.01, 3)  # Deterministic freq variation
         })
 
     return {
