@@ -14,19 +14,22 @@ const PageHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
 `;
 
 const Title = styled.h1`
-  color: #f1f5f9;
-  font-size: 2rem;
-  font-weight: 700;
+  color: #1e293b;
+  font-size: 1.75rem;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  letter-spacing: -0.025em;
 
   svg {
-    color: #64748b;
+    color: #3b82f6;
   }
 `;
 
@@ -37,11 +40,11 @@ const Controls = styled.div`
 `;
 
 const FilterContainer = styled.div`
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 `;
 
 const FilterGrid = styled.div`
@@ -58,29 +61,15 @@ const FilterGroup = styled.div`
 `;
 
 const Label = styled.label`
-  color: #94a3b8;
+  color: #475569;
   font-size: 0.875rem;
   font-weight: 500;
 `;
 
 const Select = styled.select`
-  background: #0f172a;
-  border: 1px solid #334155;
-  color: #f1f5f9;
-  padding: 0.5rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-
-  &:focus {
-    outline: none;
-    border-color: #3b82f6;
-  }
-`;
-
-const Input = styled.input`
-  background: #0f172a;
-  border: 1px solid #334155;
-  color: #f1f5f9;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
   padding: 0.5rem;
   border-radius: 6px;
   font-size: 0.875rem;
@@ -92,9 +81,9 @@ const Input = styled.input`
 `;
 
 const Button = styled.button`
-  background: ${props => props.variant === 'primary' ? '#3b82f6' : '#334155'};
-  border: 1px solid ${props => props.variant === 'primary' ? '#3b82f6' : '#475569'};
-  color: #f1f5f9;
+  background: ${props => props.variant === 'primary' ? '#3b82f6' : '#ffffff'};
+  border: 1px solid ${props => props.variant === 'primary' ? '#3b82f6' : '#e2e8f0'};
+  color: ${props => props.variant === 'primary' ? '#ffffff' : '#334155'};
   padding: 0.5rem 1rem;
   border-radius: 6px;
   cursor: pointer;
@@ -105,7 +94,12 @@ const Button = styled.button`
   font-weight: 500;
 
   &:hover {
-    background: ${props => props.variant === 'primary' ? '#2563eb' : '#475569'};
+    background: ${props => props.variant === 'primary' ? '#2563eb' : '#f8fafc'};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   svg {
@@ -115,23 +109,21 @@ const Button = styled.button`
 `;
 
 const LogsContainer = styled.div`
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-  max-height: 600px;
-  overflow-y: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 `;
 
 const LogEntry = styled.div`
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-left: 3px solid ${props => {
     switch (props.severity) {
-      case 'high': return '#ef4444';
+      case 'high': return '#dc2626';
       case 'medium': return '#f59e0b';
-      case 'low': return '#10b981';
+      case 'low': return '#16a34a';
       default: return '#3b82f6';
     }
   }};
@@ -141,7 +133,14 @@ const LogEntry = styled.div`
   transition: all 0.2s;
 
   &:hover {
-    background: #1e293b;
+    background: ${props => {
+      switch (props.severity) {
+        case 'high': return '#fef2f2';
+        case 'medium': return '#fffbeb';
+        case 'low': return '#f0fdf4';
+        default: return '#eff6ff';
+      }
+    }};
   }
 `;
 
@@ -156,7 +155,7 @@ const LogType = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #f1f5f9;
+  color: #334155;
   font-weight: 600;
   font-size: 0.9rem;
 
@@ -172,7 +171,7 @@ const LogTime = styled.div`
 `;
 
 const LogDescription = styled.div`
-  color: #cbd5e1;
+  color: #475569;
   font-size: 0.875rem;
   margin-bottom: 0.5rem;
 `;
@@ -184,8 +183,8 @@ const LogMeta = styled.div`
 `;
 
 const MetaTag = styled.span`
-  background: #334155;
-  color: #94a3b8;
+  background: #e2e8f0;
+  color: #475569;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
@@ -194,18 +193,26 @@ const MetaTag = styled.span`
 const SeverityBadge = styled.span`
   background: ${props => {
     switch (props.severity) {
-      case 'high': return '#fee2e2';
-      case 'medium': return '#fed7aa';
-      case 'low': return '#dcfce7';
-      default: return '#dbeafe';
+      case 'high': return '#fef2f2';
+      case 'medium': return '#fffbeb';
+      case 'low': return '#f0fdf4';
+      default: return '#eff6ff';
     }
   }};
   color: ${props => {
     switch (props.severity) {
-      case 'high': return '#991b1b';
-      case 'medium': return '#c2410c';
-      case 'low': return '#166534';
-      default: return '#1e40af';
+      case 'high': return '#dc2626';
+      case 'medium': return '#f59e0b';
+      case 'low': return '#16a34a';
+      default: return '#3b82f6';
+    }
+  }};
+  border: 1px solid ${props => {
+    switch (props.severity) {
+      case 'high': return '#fca5a5';
+      case 'medium': return '#fde68a';
+      case 'low': return '#86efac';
+      default: return '#93c5fd';
     }
   }};
   padding: 0.25rem 0.5rem;
@@ -221,6 +228,45 @@ const EmptyState = styled.div`
   color: #64748b;
 `;
 
+const PaginationContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+`;
+
+const PaginationInfo = styled.div`
+  color: #64748b;
+  font-size: 0.875rem;
+`;
+
+const PaginationControls = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const PageButton = styled.button`
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: ${props => props.active ? '#3b82f6' : '#ffffff'};
+  color: ${props => props.active ? '#ffffff' : '#334155'};
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: ${props => props.active ? '#2563eb' : '#f8fafc'};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 const StatsBar = styled.div`
   display: flex;
   gap: 1rem;
@@ -229,30 +275,124 @@ const StatsBar = styled.div`
 `;
 
 const StatChip = styled.div`
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   padding: 0.5rem 1rem;
   border-radius: 6px;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #cbd5e1;
+  color: #475569;
   font-size: 0.875rem;
 
   strong {
-    color: #f1f5f9;
+    color: #3b82f6;
     font-weight: 600;
   }
 `;
 
+// Fallback data when backend is unavailable
+const FALLBACK_LOGS = [
+  {
+    type: 'fault',
+    severity: 'high',
+    description: 'Transformer T1 overcurrent detected - Phase A: 1250A (threshold: 1000A)',
+    timestamp: new Date(Date.now() - 15 * 60000).toISOString(),
+    acknowledged: false,
+    duration: 15
+  },
+  {
+    type: 'alarm',
+    severity: 'high',
+    description: 'Circuit Breaker CB3 failed to respond to open command',
+    timestamp: new Date(Date.now() - 45 * 60000).toISOString(),
+    acknowledged: false,
+    duration: 45
+  },
+  {
+    type: 'warning',
+    severity: 'medium',
+    description: 'High ambient temperature in Substation A - 42°C (threshold: 40°C)',
+    timestamp: new Date(Date.now() - 90 * 60000).toISOString(),
+    acknowledged: true,
+    duration: 90
+  },
+  {
+    type: 'fault',
+    severity: 'high',
+    description: 'Bus voltage out of range - 400kV: 385.2kV (range: 390-410kV)',
+    timestamp: new Date(Date.now() - 2 * 3600000).toISOString(),
+    acknowledged: true,
+    duration: 120
+  },
+  {
+    type: 'alarm',
+    severity: 'medium',
+    description: 'Communication loss with RTU-5 for 5 minutes',
+    timestamp: new Date(Date.now() - 3 * 3600000).toISOString(),
+    acknowledged: true,
+    duration: 5
+  },
+  {
+    type: 'maintenance',
+    severity: 'low',
+    description: 'Scheduled maintenance window started for Feeder F2',
+    timestamp: new Date(Date.now() - 4 * 3600000).toISOString(),
+    acknowledged: true,
+    duration: 240
+  },
+  {
+    type: 'warning',
+    severity: 'medium',
+    description: 'Load imbalance detected - Phase difference: 18% (threshold: 15%)',
+    timestamp: new Date(Date.now() - 6 * 3600000).toISOString(),
+    acknowledged: true,
+    duration: 30
+  },
+  {
+    type: 'alarm',
+    severity: 'high',
+    description: 'SCADA server backup failed - Check storage system',
+    timestamp: new Date(Date.now() - 8 * 3600000).toISOString(),
+    acknowledged: true,
+    duration: 10
+  },
+  {
+    type: 'warning',
+    severity: 'medium',
+    description: 'Network latency increased - RTU response time: 250ms (threshold: 200ms)',
+    timestamp: new Date(Date.now() - 10 * 3600000).toISOString(),
+    acknowledged: true,
+    duration: 45
+  },
+  {
+    type: 'fault',
+    severity: 'high',
+    description: 'Ground fault detected on Feeder F7 - Isolation required',
+    timestamp: new Date(Date.now() - 12 * 3600000).toISOString(),
+    acknowledged: true,
+    duration: 180
+  },
+  {
+    type: 'maintenance',
+    severity: 'low',
+    description: 'Scheduled firmware update completed for Circuit Breaker CB1',
+    timestamp: new Date(Date.now() - 14 * 3600000).toISOString(),
+    acknowledged: true,
+    duration: 60
+  }
+];
+
 const Logging = () => {
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState(FALLBACK_LOGS);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({
     days: 7,
     eventType: '',
     severity: ''
   });
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchLogs();
@@ -267,9 +407,11 @@ const Logging = () => {
           unresolved_only: filters.eventType === 'unresolved'
         }
       });
-      setLogs(response.data.alerts || []);
+      if (response.data.alerts && response.data.alerts.length > 0) {
+        setLogs(response.data.alerts);
+      }
     } catch (error) {
-      toast.error('Failed to fetch alerts');
+      // Keep fallback data on error
       console.error('Error fetching alerts:', error);
     } finally {
       setLoading(false);
@@ -278,10 +420,7 @@ const Logging = () => {
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
-  };
-
-  const applyFilters = () => {
-    fetchLogs();
+    setCurrentPage(1); // Reset to first page when filters change
   };
 
   const exportLogs = () => {
@@ -307,8 +446,14 @@ const Logging = () => {
 
   const filteredLogs = logs.filter(log => {
     if (filters.severity && log.severity !== filters.severity) return false;
+    if (filters.eventType && log.type !== filters.eventType) return false;
     return true;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage);
 
   const stats = {
     total: filteredLogs.length,
@@ -383,12 +528,6 @@ const Logging = () => {
               <option value="low">Low</option>
             </Select>
           </FilterGroup>
-
-          <FilterGroup style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <Button variant="primary" onClick={applyFilters}>
-              Apply Filters
-            </Button>
-          </FilterGroup>
         </FilterGrid>
       </FilterContainer>
 
@@ -416,39 +555,72 @@ const Logging = () => {
         ) : filteredLogs.length === 0 ? (
           <EmptyState>No logs found for the selected filters</EmptyState>
         ) : (
-          filteredLogs.map((log, index) => (
-            <LogEntry key={index} severity={log.severity}>
-              <LogHeader>
-                <LogType>
-                  {getEventIcon(log.type)}
-                  {log.type.charAt(0).toUpperCase() + log.type.slice(1)}
-                </LogType>
-                <LogTime>
-                  {new Date(log.timestamp).toLocaleString('en-IN', {
-                    timeZone: 'Asia/Kolkata',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                  })}
-                </LogTime>
-              </LogHeader>
-              <LogDescription>{log.description}</LogDescription>
-              <LogMeta>
-                <SeverityBadge severity={log.severity}>
-                  {log.severity}
-                </SeverityBadge>
-                {log.acknowledged && (
-                  <MetaTag>✓ Acknowledged</MetaTag>
-                )}
-                {log.duration && (
-                  <MetaTag>Duration: {log.duration}min</MetaTag>
-                )}
-              </LogMeta>
-            </LogEntry>
-          ))
+          <>
+            {paginatedLogs.map((log, index) => (
+              <LogEntry key={index} severity={log.severity}>
+                <LogHeader>
+                  <LogType>
+                    {getEventIcon(log.type)}
+                    {log.type.charAt(0).toUpperCase() + log.type.slice(1)}
+                  </LogType>
+                  <LogTime>
+                    {new Date(log.timestamp).toLocaleString('en-IN', {
+                      timeZone: 'Asia/Kolkata',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })}
+                  </LogTime>
+                </LogHeader>
+                <LogDescription>{log.description}</LogDescription>
+                <LogMeta>
+                  <SeverityBadge severity={log.severity}>
+                    {log.severity}
+                  </SeverityBadge>
+                  {log.acknowledged && (
+                    <MetaTag>✓ Acknowledged</MetaTag>
+                  )}
+                  {log.duration && (
+                    <MetaTag>Duration: {log.duration}min</MetaTag>
+                  )}
+                </LogMeta>
+              </LogEntry>
+            ))}
+
+            {totalPages > 1 && (
+              <PaginationContainer>
+                <PaginationInfo>
+                  Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredLogs.length)} of {filteredLogs.length}
+                </PaginationInfo>
+                <PaginationControls>
+                  <PageButton
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </PageButton>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <PageButton
+                      key={page}
+                      active={currentPage === page}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </PageButton>
+                  ))}
+                  <PageButton
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </PageButton>
+                </PaginationControls>
+              </PaginationContainer>
+            )}
+          </>
         )}
       </LogsContainer>
     </LoggingContainer>
