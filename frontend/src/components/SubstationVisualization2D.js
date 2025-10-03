@@ -86,8 +86,8 @@ const SubstationVisualization2D = () => {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const width = 1400;
-    const height = 700;
+    const width = 1600;
+    const height = 900;
 
     svg.attr('viewBox', `0 0 ${width} ${height}`)
        .attr('preserveAspectRatio', 'xMidYMid meet');
@@ -95,158 +95,233 @@ const SubstationVisualization2D = () => {
     // Create gradients and patterns
     const defs = svg.append('defs');
 
-    // Bus gradient
-    const busGradient = defs.append('linearGradient')
-      .attr('id', 'busGradient')
+    // Bus gradient - 400kV
+    const busGradient400 = defs.append('linearGradient')
+      .attr('id', 'busGradient400')
       .attr('x1', '0%').attr('y1', '0%')
       .attr('x2', '0%').attr('y2', '100%');
+    busGradient400.append('stop').attr('offset', '0%').attr('stop-color', '#DC143C').attr('stop-opacity', 1);
+    busGradient400.append('stop').attr('offset', '100%').attr('stop-color', '#8B0000').attr('stop-opacity', 1);
 
-    busGradient.append('stop')
-      .attr('offset', '0%')
-      .attr('stop-color', '#FFD700')
-      .attr('stop-opacity', 1);
-
-    busGradient.append('stop')
-      .attr('offset', '100%')
-      .attr('stop-color', '#FFA500')
-      .attr('stop-opacity', 1);
+    // Bus gradient - 220kV
+    const busGradient220 = defs.append('linearGradient')
+      .attr('id', 'busGradient220')
+      .attr('x1', '0%').attr('y1', '0%')
+      .attr('x2', '0%').attr('y2', '100%');
+    busGradient220.append('stop').attr('offset', '0%').attr('stop-color', '#FFD700').attr('stop-opacity', 1);
+    busGradient220.append('stop').attr('offset', '100%').attr('stop-color', '#FFA500').attr('stop-opacity', 1);
 
     // Title
     svg.append('text')
       .attr('x', width / 2)
-      .attr('y', 30)
+      .attr('y', 40)
       .attr('text-anchor', 'middle')
       .attr('fill', '#f1f5f9')
-      .attr('font-size', '20px')
+      .attr('font-size', '24px')
       .attr('font-weight', 'bold')
       .text('Indian EHV 400/220 kV Substation - Single Line Diagram');
 
-    // Draw 400kV Section
-    const section400kV = svg.append('g').attr('id', 'section400kV');
+    // ========== 400 kV SECTION (TOP) ==========
+    const y400 = 120;
 
-    // 400kV Bus 1 & 2
-    drawBus(section400kV, 'bus400_1', 200, 100, 300, '400 kV Bus 1');
-    drawBus(section400kV, 'bus400_2', 600, 100, 300, '400 kV Bus 2');
+    // 400kV Incoming Lines
+    drawIncomingLine(svg, 'line400_1', 100, y400, 250, y400, '400kV Line 1');
+    drawIncomingLine(svg, 'line400_2', 1500, y400, 1350, y400, '400kV Line 2');
 
-    // Incoming 400kV Lines
-    drawIncomingLine(svg, 'line400_1', 50, 100, 200, 100, '400kV Line 1');
-    drawIncomingLine(svg, 'line400_2', 950, 100, 900, 100, '400kV Line 2');
+    // Lightning Arresters
+    drawLightningArrester(svg, 'LA400_1', 200, y400 - 30);
+    drawLightningArrester(svg, 'LA400_2', 1400, y400 - 30);
 
-    // Lightning Arresters at 400kV
-    drawLightningArrester(svg, 'LA400_1', 150, 80);
-    drawLightningArrester(svg, 'LA400_2', 950, 80);
+    // 400kV Bus 1 (Left)
+    drawBus(svg, 'bus400_1', 250, y400 - 6, 400, '400 kV Bus 1', 'busGradient400');
 
-    // CVTs at 400kV buses
-    drawCVT(svg, 'CVT400_1', 250, 120);
-    drawCVT(svg, 'CVT400_2', 650, 120);
+    // Bus Coupler CB and Isolators with connecting lines
+    // Left isolator connected to Bus 1
+    svg.append('line')
+      .attr('x1', 650).attr('y1', y400)
+      .attr('x2', 770).attr('y2', y400)
+      .attr('stroke', '#DC143C').attr('stroke-width', 3);
+    drawIsolator(svg, 'ISO_BC_L', 770, y400);
 
-    // Bus Coupler between 400kV buses
-    drawIsolator(svg, 'ISO_BC', 500, 100);
-    drawCircuitBreaker(svg, 'CB_BC', 450, 100);
+    // Circuit Breaker
+    drawCircuitBreaker(svg, 'CB_BC', 800, y400);
 
-    // Power Transformers 400/220 kV
-    drawTransformer(svg, 'TR1', 350, 250, '315 MVA\n400/220 kV');
-    drawTransformer(svg, 'TR2', 750, 250, '315 MVA\n400/220 kV');
+    // Right isolator connected to Bus 2
+    svg.append('line')
+      .attr('x1', 830).attr('y1', y400)
+      .attr('x2', 950).attr('y2', y400)
+      .attr('stroke', '#DC143C').attr('stroke-width', 3);
+    drawIsolator(svg, 'ISO_BC_R', 830, y400);
 
-    // Circuit Breakers on 400kV side
-    drawCircuitBreaker(svg, 'CB400_1', 350, 150);
-    drawCircuitBreaker(svg, 'CB400_2', 750, 150);
+    // 400kV Bus 2 (Right)
+    drawBus(svg, 'bus400_2', 950, y400 - 6, 400, '400 kV Bus 2', 'busGradient400');
 
-    // Isolators on 400kV side
-    drawIsolator(svg, 'ISO400_1', 350, 180);
-    drawIsolator(svg, 'ISO400_2', 750, 180);
+    // ========== TRANSFORMER BAY 1 (LEFT) ==========
+    const tx1_x = 450;
+    const tx1_y_top = y400 + 80;
 
-    // Current Transformers
-    drawCT(svg, 'CT400_1', 350, 210);
-    drawCT(svg, 'CT400_2', 750, 210);
+    // Connection from Bus 1 to TX1 - complete vertical line
+    svg.append('line')
+      .attr('x1', tx1_x).attr('y1', y400 + 9)
+      .attr('x2', tx1_x).attr('y2', tx1_y_top + 170)
+      .attr('stroke', '#DC143C').attr('stroke-width', 3);
 
-    // Draw 220kV Section
-    const section220kV = svg.append('g').attr('id', 'section220kV');
+    // 400kV side equipment
+    drawCircuitBreaker(svg, 'CB400_1', tx1_x, tx1_y_top - 50);
+    drawIsolator(svg, 'ISO400_1', tx1_x, tx1_y_top - 20);
+    drawCT(svg, 'CT400_1', tx1_x + 30, tx1_y_top);
+    drawCVT(svg, 'CVT400_1', tx1_x - 30, tx1_y_top);
+
+    // Transformer 1
+    drawTransformer(svg, 'TR1', tx1_x, tx1_y_top + 120, '315 MVA\n400/220 kV');
+
+    // ========== TRANSFORMER BAY 2 (RIGHT) ==========
+    const tx2_x = 1150;
+    const tx2_y_top = y400 + 80;
+
+    // Connection from Bus 2 to TX2 - complete vertical line
+    svg.append('line')
+      .attr('x1', tx2_x).attr('y1', y400 + 9)
+      .attr('x2', tx2_x).attr('y2', tx2_y_top + 170)
+      .attr('stroke', '#DC143C').attr('stroke-width', 3);
+
+    // 400kV side equipment
+    drawCircuitBreaker(svg, 'CB400_2', tx2_x, tx2_y_top - 50);
+    drawIsolator(svg, 'ISO400_2', tx2_x, tx2_y_top - 20);
+    drawCT(svg, 'CT400_2', tx2_x + 30, tx2_y_top);
+    drawCVT(svg, 'CVT400_2', tx2_x - 30, tx2_y_top);
+
+    // Transformer 2
+    drawTransformer(svg, 'TR2', tx2_x, tx2_y_top + 120, '315 MVA\n400/220 kV');
+
+    // ========== 220 kV SECTION (BOTTOM) ==========
+    const y220 = 550;
+
+    // 220kV side equipment for TX1
+    drawCT(svg, 'CT220_1', tx1_x + 30, y220 - 120);
+    drawCVT(svg, 'CVT220_1', tx1_x - 30, y220 - 120);
+    drawIsolator(svg, 'ISO220_1', tx1_x, y220 - 90);
+    drawCircuitBreaker(svg, 'CB220_1', tx1_x, y220 - 60);
+
+    // 220kV side equipment for TX2
+    drawCT(svg, 'CT220_2', tx2_x + 30, y220 - 120);
+    drawCVT(svg, 'CVT220_2', tx2_x - 30, y220 - 120);
+    drawIsolator(svg, 'ISO220_2', tx2_x, y220 - 90);
+    drawCircuitBreaker(svg, 'CB220_2', tx2_x, y220 - 60);
 
     // 220kV Bus 1 & 2
-    drawBus(section220kV, 'bus220_1', 200, 450, 250, '220 kV Bus 1');
-    drawBus(section220kV, 'bus220_2', 500, 450, 250, '220 kV Bus 2');
+    drawBus(svg, 'bus220_1', 300, y220 - 6, 350, '220 kV Bus 1', 'busGradient220');
+    drawBus(svg, 'bus220_2', 950, y220 - 6, 350, '220 kV Bus 2', 'busGradient220');
 
-    // Circuit Breakers on 220kV side
-    drawCircuitBreaker(svg, 'CB220_1', 350, 380);
-    drawCircuitBreaker(svg, 'CB220_2', 750, 380);
+    // 220kV Bus Coupler with connecting lines
+    // Left isolator connected to Bus 1
+    svg.append('line')
+      .attr('x1', 650).attr('y1', y220)
+      .attr('x2', 770).attr('y2', y220)
+      .attr('stroke', '#FFD700').attr('stroke-width', 3);
+    drawIsolator(svg, 'ISO_BC_220_L', 770, y220);
 
-    // Isolators on 220kV side
-    drawIsolator(svg, 'ISO220_1', 350, 410);
-    drawIsolator(svg, 'ISO220_2', 750, 410);
+    // Circuit Breaker
+    drawCircuitBreaker(svg, 'CB_BC_220', 800, y220);
 
-    // CTs on 220kV side
-    drawCT(svg, 'CT220_1', 350, 350);
-    drawCT(svg, 'CT220_2', 750, 350);
+    // Right isolator connected to Bus 2
+    svg.append('line')
+      .attr('x1', 830).attr('y1', y220)
+      .attr('x2', 950).attr('y2', y220)
+      .attr('stroke', '#FFD700').attr('stroke-width', 3);
+    drawIsolator(svg, 'ISO_BC_220_R', 830, y220);
 
-    // CVTs at 220kV buses
-    drawCVT(svg, 'CVT220_1', 250, 470);
-    drawCVT(svg, 'CVT220_2', 550, 470);
+    // Connections from transformers to 220kV buses - complete lines
+    svg.append('line')
+      .attr('x1', tx1_x).attr('y1', tx1_y_top + 170)
+      .attr('x2', tx1_x).attr('y2', y220 - 9)
+      .attr('stroke', '#FFD700').attr('stroke-width', 3);
 
-    // Lightning Arresters at 220kV
-    drawLightningArrester(svg, 'LA220_1', 300, 430);
-    drawLightningArrester(svg, 'LA220_2', 600, 430);
+    svg.append('line')
+      .attr('x1', tx2_x).attr('y1', tx2_y_top + 170)
+      .attr('x2', tx2_x).attr('y2', y220 - 9)
+      .attr('stroke', '#FFD700').attr('stroke-width', 3);
 
-    // Outgoing 220kV Feeders
-    drawOutgoingFeeder(svg, 'feeder220_1', 150, 450, '220kV Feeder 1');
-    drawOutgoingFeeder(svg, 'feeder220_2', 450, 450, '220kV Feeder 2');
-    drawOutgoingFeeder(svg, 'feeder220_3', 800, 450, '220kV Feeder 3');
+    // ========== 220 kV FEEDERS ==========
+    const feeder_y = y220 + 100;
 
-    // Shunt Reactors
-    drawShuntReactor(svg, 'SR1', 950, 450, '50 MVAR');
-    drawShuntReactor(svg, 'SR2', 1050, 450, '50 MVAR');
+    // Feeder 1 from Bus 1
+    svg.append('line')
+      .attr('x1', 350).attr('y1', y220 + 9)
+      .attr('x2', 350).attr('y2', feeder_y + 60)
+      .attr('stroke', '#FFD700').attr('stroke-width', 3);
+    drawCircuitBreaker(svg, 'CB_F1', 350, feeder_y + 20);
+    drawOutgoingFeeder(svg, 'feeder220_1', 350, feeder_y + 60, '220kV Feeder 1\n(50 km)');
 
-    // Capacitor Banks
-    drawCapacitorBank(svg, 'CAP1', 1150, 450, '30 MVAR');
-    drawCapacitorBank(svg, 'CAP2', 1250, 450, '30 MVAR');
+    // Feeder 2 from Bus 1
+    svg.append('line')
+      .attr('x1', 500).attr('y1', y220 + 9)
+      .attr('x2', 500).attr('y2', feeder_y + 60)
+      .attr('stroke', '#FFD700').attr('stroke-width', 3);
+    drawCircuitBreaker(svg, 'CB_F2', 500, feeder_y + 20);
+    drawOutgoingFeeder(svg, 'feeder220_2', 500, feeder_y + 60, '220kV Feeder 2\n(35 km)');
 
-    // Auxiliary Systems
-    drawAuxiliaryTransformer(svg, 'AUX_TR1', 100, 550, '1 MVA');
-    drawAuxiliaryTransformer(svg, 'AUX_TR2', 200, 550, '1 MVA');
+    // Feeder 3 from Bus 2
+    svg.append('line')
+      .attr('x1', 1050).attr('y1', y220 + 9)
+      .attr('x2', 1050).attr('y2', feeder_y + 60)
+      .attr('stroke', '#FFD700').attr('stroke-width', 3);
+    drawCircuitBreaker(svg, 'CB_F3', 1050, feeder_y + 20);
+    drawOutgoingFeeder(svg, 'feeder220_3', 1050, feeder_y + 60, '220kV Feeder 3\n(45 km)');
 
-    // Battery Bank & DC System
-    drawBatteryBank(svg, 'BATTERY', 100, 620);
+    // Feeder 4 from Bus 2
+    svg.append('line')
+      .attr('x1', 1200).attr('y1', y220 + 9)
+      .attr('x2', 1200).attr('y2', feeder_y + 60)
+      .attr('stroke', '#FFD700').attr('stroke-width', 3);
+    drawCircuitBreaker(svg, 'CB_F4', 1200, feeder_y + 20);
+    drawOutgoingFeeder(svg, 'feeder220_4', 1200, feeder_y + 60, '220kV Feeder 4\n(30 km)');
 
-    // Control Panel
-    drawControlPanel(svg, 'CONTROL', 250, 620);
+    // Shunt Reactor on Bus 2
+    svg.append('line')
+      .attr('x1', 1300).attr('y1', y220 + 9)
+      .attr('x2', 1300).attr('y2', feeder_y + 40)
+      .attr('stroke', '#a78bfa').attr('stroke-width', 3);
+    drawShuntReactor(svg, 'SR1', 1300, feeder_y + 40, '63 MVAR');
 
-    // Fire Protection System
-    drawFireProtection(svg, 'FIRE', 400, 620);
+    // Legend with voltage color coding
+    const legend = svg.append('g').attr('id', 'legend').attr('transform', `translate(50, ${height - 120})`);
 
-    // Emergency Diesel Generator
-    drawDieselGenerator(svg, 'DG', 550, 620);
+    legend.append('rect').attr('x', 0).attr('y', 0).attr('width', 250).attr('height', 100).attr('fill', 'rgba(30, 41, 59, 0.9)').attr('stroke', '#475569').attr('rx', 8);
 
-    // Earthing System
-    drawEarthingSystem(svg, 'EARTH', 700, 620);
+    legend.append('text').attr('x', 10).attr('y', 25).attr('fill', '#f1f5f9').attr('font-size', '14px').attr('font-weight', 'bold').text('Legend');
 
-    // Wave Traps
-    drawWaveTrap(svg, 'WT1', 100, 100);
-    drawWaveTrap(svg, 'WT2', 1000, 100);
+    legend.append('line').attr('x1', 10).attr('y1', 40).attr('x2', 40).attr('y2', 40).attr('stroke', '#DC143C').attr('stroke-width', 4);
+    legend.append('text').attr('x', 50).attr('y', 45).attr('fill', '#cbd5e1').attr('font-size', '12px').text('400 kV System');
 
-    // Draw connections
-    drawConnections(svg);
+    legend.append('line').attr('x1', 10).attr('y1', 60).attr('x2', 40).attr('y2', 60).attr('stroke', '#FFD700').attr('stroke-width', 4);
+    legend.append('text').attr('x', 50).attr('y', 65).attr('fill', '#cbd5e1').attr('font-size', '12px').text('220 kV System');
+
+    legend.append('circle').attr('cx', 25).attr('cy', 82).attr('r', 8).attr('fill', 'none').attr('stroke', '#4CAF50').attr('stroke-width', 2);
+    legend.append('text').attr('x', 50).attr('y', 87).attr('fill', '#cbd5e1').attr('font-size', '12px').text('Transformer');
 
     // Add animation to power flow
     animatePowerFlow(svg);
   };
 
-  const drawBus = (parent, id, x, y, width, label) => {
-    const g = parent.append('g').attr('id', id);
+  const drawBus = (parent, id, x, y, width, label, gradient = 'busGradient400') => {
+    const g = parent.append('g').attr('id', id).attr('class', 'bus');
 
     g.append('rect')
       .attr('x', x).attr('y', y)
-      .attr('width', width).attr('height', 12)
-      .attr('fill', 'url(#busGradient)')
-      .attr('stroke', '#333')
+      .attr('width', width).attr('height', 15)
+      .attr('fill', `url(#${gradient})`)
+      .attr('stroke', '#fff')
       .attr('stroke-width', 2)
-      .attr('rx', 2);
+      .attr('rx', 3)
+      .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
 
     g.append('text')
-      .attr('x', x + width/2).attr('y', y - 5)
+      .attr('x', x + width/2).attr('y', y - 10)
       .attr('text-anchor', 'middle')
       .attr('fill', '#f1f5f9')
-      .attr('font-size', '12px')
-      .attr('font-weight', 'bold')
+      .attr('font-size', '14px')
+      .attr('font-weight', '600')
       .text(label);
   };
 
@@ -840,42 +915,6 @@ const SubstationVisualization2D = () => {
       <StatusIndicator status={systemStatus}>
         System Status: {systemStatus.toUpperCase()}
       </StatusIndicator>
-
-      <Legend>
-        <h4>Component Legend</h4>
-        <div className="legend-item">
-          <div className="legend-color" style={{ background: '#FFD700' }}></div>
-          <span>Bus Bars</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color" style={{ background: '#4CAF50' }}></div>
-          <span>Transformers</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color" style={{ background: '#FF5722' }}></div>
-          <span>Circuit Breakers</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color" style={{ background: '#9C27B0' }}></div>
-          <span>Isolators</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color" style={{ background: '#FF9800' }}></div>
-          <span>Current Transformers</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color" style={{ background: '#00BCD4' }}></div>
-          <span>CVTs & Lines</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color" style={{ background: '#FFEB3B' }}></div>
-          <span>Lightning Arresters</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color" style={{ background: '#00E676' }}></div>
-          <span>Capacitor Banks</span>
-        </div>
-      </Legend>
 
       <svg ref={svgRef} style={{ width: '100%', height: '100%' }} />
     </VisualizationContainer>

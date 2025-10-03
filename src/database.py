@@ -1,27 +1,63 @@
 """
 Database module for storing digital twin metrics and historical data.
-Uses SQLite for simplicity - can be upgraded to TimescaleDB or InfluxDB for production.
+Uses PostgreSQL for production-grade storage with SQLite fallback.
 """
 
-import sqlite3
 import json
+import logging
+import sqlite3
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import threading
 from contextlib import contextmanager
 
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    POSTGRES_AVAILABLE = False
+
+from src.config import Config
+
+logger = logging.getLogger(__name__)
+
 class DigitalTwinDatabase:
     def __init__(self, db_path: str = "digital_twin.db"):
         self.db_path = db_path
         self.local = threading.local()
+        self.use_postgres = POSTGRES_AVAILABLE and Config.DB_TYPE == 'postgresql'
+
+        if self.use_postgres:
+            logger.info("Using PostgreSQL database")
+            self.conn_params = {
+                'host': Config.DB_HOST,
+                'port': Config.DB_PORT,
+                'database': Config.DB_NAME,
+                'user': Config.DB_USER,
+                'password': Config.DB_PASSWORD
+            }
+        else:
+            logger.info(f"Using SQLite database: {db_path}")
+
         self.init_database()
 
     @contextmanager
     def get_connection(self):
         """Thread-safe database connection."""
-        if not hasattr(self.local, 'connection'):
-            self.local.connection = sqlite3.connect(self.db_path, check_same_thread=False)
-            self.local.connection.row_factory = sqlite3.Row
+        if not hasattr(self.local, 'connection') or self.local.connection is None:
+            if self.use_postgres:
+                try:
+                    self.local.connection = psycopg2.connect(**self.conn_params)
+                except Exception as e:
+                    logger.error(f"PostgreSQL connection failed: {e}, falling back to SQLite")
+                    self.use_postgres = False
+                    self.local.connection = sqlite3.connect(self.db_path, check_same_thread=False)
+                    self.local.connection.row_factory = sqlite3.Row
+            else:
+                self.local.connection = sqlite3.connect(self.db_path, check_same_thread=False)
+                self.local.connection.row_factory = sqlite3.Row
+
         try:
             yield self.local.connection
         except Exception as e:
@@ -31,71 +67,135 @@ class DigitalTwinDatabase:
             self.local.connection.commit()
 
     def init_database(self):
-        """Initialize database tables."""
+        """Initialize database tables - compatible with both PostgreSQL and SQLite."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Metrics table for time-series data
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS metrics (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    total_power REAL,
-                    efficiency REAL,
-                    power_factor REAL,
-                    frequency REAL,
-                    total_load REAL,
-                    generation REAL,
-                    losses REAL,
-                    data JSON
-                )
-            ''')
+            # SQL syntax that works for both PostgreSQL and SQLite
+            if self.use_postgres:
+                # PostgreSQL syntax
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS metrics (
+                        id SERIAL PRIMARY KEY,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        total_power REAL,
+                        efficiency REAL,
+                        power_factor REAL,
+                        frequency REAL,
+                        total_load REAL,
+                        generation REAL,
+                        losses REAL,
+                        data JSONB
+                    )
+                ''')
+            else:
+                # SQLite syntax
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS metrics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        total_power REAL,
+                        efficiency REAL,
+                        power_factor REAL,
+                        frequency REAL,
+                        total_load REAL,
+                        generation REAL,
+                        losses REAL,
+                        data JSON
+                    )
+                ''')
 
             # Assets table for asset states over time
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS asset_states (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    asset_id TEXT,
-                    asset_type TEXT,
-                    status TEXT,
-                    health_score REAL,
-                    voltage REAL,
-                    current REAL,
-                    power REAL,
-                    temperature REAL,
-                    data JSON
-                )
-            ''')
+            if self.use_postgres:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS asset_states (
+                        id SERIAL PRIMARY KEY,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        asset_id TEXT,
+                        asset_type TEXT,
+                        status TEXT,
+                        health_score REAL,
+                        voltage REAL,
+                        current REAL,
+                        power REAL,
+                        temperature REAL,
+                        data JSONB
+                    )
+                ''')
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS asset_states (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        asset_id TEXT,
+                        asset_type TEXT,
+                        status TEXT,
+                        health_score REAL,
+                        voltage REAL,
+                        current REAL,
+                        power REAL,
+                        temperature REAL,
+                        data JSON
+                    )
+                ''')
 
             # Alerts/Events table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS alerts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    alert_type TEXT,
-                    severity TEXT,
-                    asset_id TEXT,
-                    message TEXT,
-                    acknowledged BOOLEAN DEFAULT FALSE,
-                    resolved BOOLEAN DEFAULT FALSE,
-                    data JSON
-                )
-            ''')
+            if self.use_postgres:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS alerts (
+                        id SERIAL PRIMARY KEY,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        alert_type TEXT,
+                        severity TEXT,
+                        asset_id TEXT,
+                        message TEXT,
+                        acknowledged BOOLEAN DEFAULT FALSE,
+                        resolved BOOLEAN DEFAULT FALSE,
+                        data JSONB
+                    )
+                ''')
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS alerts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        alert_type TEXT,
+                        severity TEXT,
+                        asset_id TEXT,
+                        message TEXT,
+                        acknowledged BOOLEAN DEFAULT FALSE,
+                        resolved BOOLEAN DEFAULT FALSE,
+                        data JSON
+                    )
+                ''')
 
             # AI Analysis results table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS ai_analysis (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    analysis_type TEXT,
-                    asset_id TEXT,
-                    anomaly_score REAL,
-                    prediction TEXT,
-                    recommendation TEXT,
-                    data JSON
-                )
-            ''')
+            if self.use_postgres:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS ai_analysis (
+                        id SERIAL PRIMARY KEY,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        analysis_type TEXT,
+                        asset_id TEXT,
+                        anomaly_score REAL,
+                        prediction TEXT,
+                        recommendation TEXT,
+                        data JSONB
+                    )
+                ''')
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS ai_analysis (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        analysis_type TEXT,
+                        asset_id TEXT,
+                        anomaly_score REAL,
+                        prediction TEXT,
+                        recommendation TEXT,
+                        data JSON
+                    )
+                ''')
 
             # Create indexes for better query performance
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp DESC)')

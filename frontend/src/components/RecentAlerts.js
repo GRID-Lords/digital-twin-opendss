@@ -3,25 +3,25 @@ import styled from 'styled-components';
 import { FiAlertTriangle, FiInfo, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 
 const AlertsContainer = styled.div`
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-  padding: 1.5rem;
-  color: #f1f5f9;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  padding: 1.25rem;
+  color: #0f172a;
 `;
 
 const AlertsTitle = styled.h3`
-  font-size: 1.1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: #f1f5f9;
+  color: #0f172a;
 `;
 
 const AlertList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.625rem;
 `;
 
 const AlertItem = styled.div`
@@ -29,19 +29,20 @@ const AlertItem = styled.div`
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  border-left: 3px solid ${props => props.severity === 'high' ? '#ef4444' : props.severity === 'medium' ? '#f59e0b' : '#4ade80'};
+  background: #f8fafc;
+  border-radius: 6px;
+  border-left: 3px solid ${props => props.severity === 'high' ? '#dc2626' : props.severity === 'medium' ? '#f59e0b' : '#16a34a'};
   transition: all 0.2s ease;
-  
+
   &:hover {
-    background: #334155;
+    background: #f1f5f9;
+    box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.05);
   }
 `;
 
 const AlertIcon = styled.div`
-  font-size: 1.2rem;
-  color: ${props => props.severity === 'high' ? '#ef4444' : props.severity === 'medium' ? '#f59e0b' : '#4ade80'};
+  font-size: 1.125rem;
+  color: ${props => props.severity === 'high' ? '#dc2626' : props.severity === 'medium' ? '#f59e0b' : '#16a34a'};
 `;
 
 const AlertContent = styled.div`
@@ -49,24 +50,26 @@ const AlertContent = styled.div`
 `;
 
 const AlertMessage = styled.div`
-  font-size: 0.9rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   margin-bottom: 0.25rem;
+  color: #0f172a;
 `;
 
 const AlertTime = styled.div`
-  font-size: 0.8rem;
-  color: #94a3b8;
+  font-size: 0.75rem;
+  color: #64748b;
 `;
 
 const AlertSeverity = styled.div`
-  font-size: 0.8rem;
+  font-size: 0.6875rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  background: ${props => props.severity === 'high' ? 'rgba(239, 68, 68, 0.2)' : props.severity === 'medium' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(74, 222, 128, 0.2)'};
-  color: ${props => props.severity === 'high' ? '#ef4444' : props.severity === 'medium' ? '#f59e0b' : '#4ade80'};
-  font-weight: 500;
+  border-radius: 9999px;
+  background: ${props => props.severity === 'high' ? '#fef2f2' : props.severity === 'medium' ? '#fef3c7' : '#f0fdf4'};
+  color: ${props => props.severity === 'high' ? '#dc2626' : props.severity === 'medium' ? '#d97706' : '#16a34a'};
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.025em;
 `;
 
 const RecentAlerts = () => {

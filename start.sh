@@ -83,6 +83,34 @@ start_local() {
     # Load environment
     load_env
 
+    # Step 0: Start database containers
+    echo -e "${BLUE}[0/6] Starting database containers...${NC}"
+    if command_exists docker; then
+        # Start databases using docker compose
+        docker compose up -d postgres redis influxdb grafana 2>/dev/null || docker-compose up -d postgres redis influxdb grafana 2>/dev/null || true
+
+        # Wait for databases to be ready
+        echo -e "${YELLOW}Waiting for databases to be ready...${NC}"
+        sleep 5
+
+        # Check PostgreSQL
+        if docker ps | grep -q digitaltwin-postgres; then
+            echo -e "${GREEN}✓ PostgreSQL running${NC}"
+        fi
+
+        # Check Redis
+        if docker ps | grep -q digitaltwin-redis; then
+            echo -e "${GREEN}✓ Redis running${NC}"
+        fi
+
+        # Check InfluxDB
+        if docker ps | grep -q digitaltwin-influxdb; then
+            echo -e "${GREEN}✓ InfluxDB running${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Docker not found - using local SQLite databases${NC}"
+    fi
+
     # Step 1: Check Python environment
     echo -e "${BLUE}[1/5] Checking Python environment...${NC}"
     if [ -d "venv" ]; then
@@ -98,7 +126,8 @@ start_local() {
     echo -e "${BLUE}[2/5] Installing dependencies...${NC}"
     pip install -q --upgrade pip
     pip install -q fastapi uvicorn websockets pandas numpy scikit-learn matplotlib \
-        httpx python-multipart aiofiles py-dss-interface pymodbus python-dotenv redis 2>/dev/null || true
+        httpx python-multipart aiofiles py-dss-interface pymodbus python-dotenv redis \
+        psycopg2-binary influxdb-client 2>/dev/null || true
     echo -e "${GREEN}✓ Dependencies installed${NC}"
 
     # Step 3: Train AI models if needed

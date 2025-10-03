@@ -3,16 +3,16 @@ import styled from 'styled-components';
 import { motion } from 'framer-motion';
 
 const Card = styled(motion.div)`
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-  padding: 1.5rem;
-  transition: all 0.3s ease;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  padding: 1.25rem;
+  transition: all 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06);
+    border-color: #cbd5e1;
   }
 `;
 
@@ -20,35 +20,38 @@ const CardHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 `;
 
 const CardTitle = styled.h3`
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
+  color: #64748b;
+  letter-spacing: 0.01em;
 `;
 
 const CardIcon = styled.div`
-  font-size: 1.5rem;
+  font-size: 1.25rem;
 `;
 
 const CardValue = styled.div`
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 1.75rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
-  color: #f1f5f9;
+  color: #0f172a;
 `;
 
 const CardTrend = styled.div`
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.875rem;
-  color: ${props => props.positive ? '#10b981' : '#ef4444'};
+  font-size: 0.8125rem;
+  color: ${props => props.positive ? '#16a34a' : '#dc2626'};
   font-weight: 500;
+  background: ${props => props.positive ? '#f0fdf4' : '#fef2f2'};
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  width: fit-content;
 `;
 
 const TrendIcon = styled.span`

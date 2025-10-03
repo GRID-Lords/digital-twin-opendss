@@ -100,15 +100,22 @@ class OpenDSSAnomalySimulator:
 
             # Create a default circuit if file doesn't exist
             if not os.path.exists(self.dss_file):
+                logger.warning(f"DSS file not found: {self.dss_file}, creating default circuit")
                 self._create_default_ehv_circuit()
             else:
-                self.dss.text(f"compile [{self.dss_file}]")
+                logger.info(f"Compiling DSS file: {self.dss_file}")
+                result = self.dss.text(f"compile [{self.dss_file}]")
+                if result and 'error' in str(result).lower():
+                    logger.error(f"DSS compilation error: {result}")
+                    raise RuntimeError(f"DSS compilation error: {result}")
 
             # Solve baseline
-            self.dss.text("solve")
-            self._store_baseline()
+            solve_result = self.dss.text("solve")
+            if solve_result and 'not converged' in str(solve_result).lower():
+                logger.warning(f"DSS solve warning: {solve_result}")
 
-            logger.info(f"OpenDSS initialized with circuit: {self.dss_file}")
+            self._store_baseline()
+            logger.info(f"OpenDSS initialized successfully with circuit: {self.dss_file}")
 
         except Exception as e:
             logger.error(f"Failed to initialize OpenDSS: {e}")
@@ -245,6 +252,9 @@ class OpenDSSAnomalySimulator:
     def inject_voltage_sag(self, bus: str, magnitude: float = 0.7,
                           duration_cycles: int = 30, phases: List[str] = ['A', 'B', 'C']):
         """Inject voltage sag anomaly"""
+        if not self.dss:
+            raise RuntimeError("OpenDSS not initialized. Cannot inject anomaly.")
+
         logger.info(f"Injecting voltage sag at {bus}: {magnitude} pu for {duration_cycles} cycles")
 
         # Create fault to simulate voltage sag
