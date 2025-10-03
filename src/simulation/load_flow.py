@@ -104,8 +104,7 @@ class LoadFlowAnalysis:
                 self.dss.Text.Command("CalcVoltageBases")
 
             # Apply realistic load patterns before solving
-            # TEMPORARILY DISABLED to test
-            # self.apply_realistic_load_pattern()
+            self.apply_realistic_load_pattern()
 
             # Solve the power flow
             self.dss.Text.Command("solve")
@@ -123,23 +122,25 @@ class LoadFlowAnalysis:
             bus_names = self.dss.Circuit.AllBusNames()
             logger.info(f"Found {len(bus_names)} buses in circuit")
 
+            import math
             for bus_name in bus_names:
                 self.dss.Circuit.SetActiveBus(bus_name)
                 v_pu = self.dss.Bus.puVmagAngle()
                 if v_pu and len(v_pu) > 0:
                     voltages_pu.append(v_pu[0])  # Magnitude
 
-                    # Get actual kV value
+                    # Get actual kV value (OpenDSS returns line-to-neutral for 3-phase)
                     kv_base = self.dss.Bus.kVBase()
-                    kv_actual = v_pu[0] * kv_base
+                    kv_actual_ln = v_pu[0] * kv_base
+                    kv_actual_ll = kv_actual_ln * math.sqrt(3)  # Convert to line-to-line
 
-                    # Categorize by voltage level
-                    if kv_base > 300:  # 400kV bus
-                        voltage_400kv = kv_actual
-                        logger.info(f"400kV bus: {bus_name}, kv_base={kv_base:.2f}, v_pu={v_pu[0]:.4f}, kv_actual={kv_actual:.2f}")
-                    elif kv_base > 100:  # 220kV bus
-                        voltage_220kv = kv_actual
-                        logger.info(f"220kV bus: {bus_name}, kv_base={kv_base:.2f}, v_pu={v_pu[0]:.4f}, kv_actual={kv_actual:.2f}")
+                    # Categorize by voltage level (kv_base is L-N: 400kV L-L = 231 kV L-N)
+                    if kv_base > 200:  # 400kV bus (L-N base ~231 kV)
+                        voltage_400kv = kv_actual_ll
+                        logger.info(f"400kV bus: {bus_name}, kv_base={kv_base:.2f}, v_pu={v_pu[0]:.4f}, kv_L-L={kv_actual_ll:.2f}")
+                    elif kv_base > 50:  # 220kV bus (L-N base ~127 kV)
+                        voltage_220kv = kv_actual_ll
+                        logger.info(f"220kV bus: {bus_name}, kv_base={kv_base:.2f}, v_pu={v_pu[0]:.4f}, kv_L-L={kv_actual_ll:.2f}")
 
             max_voltage_pu = max(voltages_pu) if voltages_pu else 1.0
             min_voltage_pu = min(voltages_pu) if voltages_pu else 1.0
