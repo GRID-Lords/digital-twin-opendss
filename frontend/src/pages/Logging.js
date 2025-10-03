@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FileText, Filter, Download, RefreshCw, AlertCircle, Info, AlertTriangle, CheckCircle, X, ExternalLink } from 'lucide-react';
+import { FileText, Filter, Download, RefreshCw, AlertCircle, Info, AlertTriangle, CheckCircle, X, ExternalLink, Gauge } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
@@ -414,6 +414,56 @@ const ViewDetailsButton = styled.button`
     width: 14px;
     height: 14px;
   }
+`;
+
+const SystemStateSection = styled.div`
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+`;
+
+const SystemStateTitle = styled.h3`
+  color: #1e293b;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    color: #3b82f6;
+  }
+`;
+
+const SystemStateGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+`;
+
+const StateItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+`;
+
+const StateLabel = styled.div`
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const StateValue = styled.div`
+  font-size: 0.9375rem;
+  color: #1e293b;
+  font-weight: 600;
 `;
 
 const EmptyState = styled.div`
@@ -890,6 +940,81 @@ const Logging = () => {
                   </MetaItem>
                 )}
               </DialogMeta>
+
+              {/* System State at Time of Anomaly */}
+              {selectedAlert.data && typeof selectedAlert.data === 'string' &&
+               (() => {
+                 try {
+                   const parsedData = JSON.parse(selectedAlert.data);
+                   return parsedData.system_state && Object.keys(parsedData.system_state).length > 0 ? (
+                     <SystemStateSection>
+                       <SystemStateTitle>
+                         <Gauge />
+                         System State at Time of Anomaly
+                       </SystemStateTitle>
+                       <SystemStateGrid>
+                         {parsedData.system_state.total_power_mw !== undefined && (
+                           <StateItem>
+                             <StateLabel>Total Power</StateLabel>
+                             <StateValue>{parsedData.system_state.total_power_mw} MW</StateValue>
+                           </StateItem>
+                         )}
+                         {parsedData.system_state.voltage_400kv !== undefined && (
+                           <StateItem>
+                             <StateLabel>Voltage 400kV</StateLabel>
+                             <StateValue>{parsedData.system_state.voltage_400kv} kV</StateValue>
+                           </StateItem>
+                         )}
+                         {parsedData.system_state.voltage_220kv !== undefined && (
+                           <StateItem>
+                             <StateLabel>Voltage 220kV</StateLabel>
+                             <StateValue>{parsedData.system_state.voltage_220kv} kV</StateValue>
+                           </StateItem>
+                         )}
+                         {parsedData.system_state.frequency_hz !== undefined && (
+                           <StateItem>
+                             <StateLabel>Frequency</StateLabel>
+                             <StateValue>{parsedData.system_state.frequency_hz} Hz</StateValue>
+                           </StateItem>
+                         )}
+                         {parsedData.system_state.power_factor !== undefined && (
+                           <StateItem>
+                             <StateLabel>Power Factor</StateLabel>
+                             <StateValue>{parsedData.system_state.power_factor}</StateValue>
+                           </StateItem>
+                         )}
+                         {parsedData.system_state.efficiency !== undefined && (
+                           <StateItem>
+                             <StateLabel>Efficiency</StateLabel>
+                             <StateValue>{parsedData.system_state.efficiency}%</StateValue>
+                           </StateItem>
+                         )}
+                         {parsedData.system_state.losses_mw !== undefined && (
+                           <StateItem>
+                             <StateLabel>Losses</StateLabel>
+                             <StateValue>{parsedData.system_state.losses_mw} MW</StateValue>
+                           </StateItem>
+                         )}
+                         {parsedData.system_state.generation_mw !== undefined && (
+                           <StateItem>
+                             <StateLabel>Generation</StateLabel>
+                             <StateValue>{parsedData.system_state.generation_mw} MW</StateValue>
+                           </StateItem>
+                         )}
+                         {parsedData.system_state.total_load_mw !== undefined && (
+                           <StateItem>
+                             <StateLabel>Total Load</StateLabel>
+                             <StateValue>{parsedData.system_state.total_load_mw} MW</StateValue>
+                           </StateItem>
+                         )}
+                       </SystemStateGrid>
+                     </SystemStateSection>
+                   ) : null;
+                 } catch (e) {
+                   return null;
+                 }
+               })()
+              }
 
               <MarkdownContent>
                 <ReactMarkdown>{selectedAlert.description}</ReactMarkdown>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import axios from 'axios';
+import AlertsTable from '../components/AlertsTable';
 
 const TrendsContainer = styled.div`
   display: flex;
@@ -392,6 +393,14 @@ const Trends = () => {
           </ResponsiveContainer>
         </ChartCard>
       </ChartsGrid>
+
+      <ChartCard style={{ marginTop: '2rem' }}>
+        <ChartTitle>
+          Threshold Alerts
+          <DataSource>🔔 Real-time threshold monitoring</DataSource>
+        </ChartTitle>
+        <AlertsTable sourceFilter="manual_alerts" />
+      </ChartCard>
     </TrendsContainer>
   );
 };

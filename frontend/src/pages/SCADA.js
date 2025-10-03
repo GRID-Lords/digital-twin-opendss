@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useDigitalTwin } from '../context/DigitalTwinContext';
-import { FiAlertTriangle, FiCheckCircle, FiCpu, FiZap, FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiAlertTriangle, FiCheckCircle, FiCpu, FiZap, FiSearch, FiChevronLeft, FiChevronRight, FiSettings } from 'react-icons/fi';
+import ThresholdManager from '../components/ThresholdManager';
 
 const SCADAContainer = styled.div`
   display: flex;
@@ -579,14 +580,6 @@ const FALLBACK_IOT_RESPONSE = {
 const SCADA = () => {
   const { scadaData, iotDevices } = useDigitalTwin();
 
-  // Filter and pagination state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [severityFilter, setSeverityFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-
-  // No need to fetch on mount - DigitalTwinContext already handles auto-refresh
-
   // Use fallback data if real data is empty or undefined
   // Check multiple possible response structures from backend
   const scadaPoints = (scadaData?.scada_data && Object.keys(scadaData.scada_data).length > 0)
@@ -598,92 +591,6 @@ const SCADA = () => {
   const iotData = (iotDevices?.devices && iotDevices.devices.length > 0)
     ? iotDevices.devices
     : FALLBACK_IOT_RESPONSE.devices;
-
-  // Extended sample alarms data for demonstration
-  const allAlarms = [
-    {
-      id: 1,
-      message: '400kV voltage out of range: 385.2 kV',
-      time: '2 minutes ago',
-      severity: 'high',
-      location: '400kV Bus A',
-      status: 'Active'
-    },
-    {
-      id: 2,
-      message: 'High transformer temperature: 85.3°C',
-      time: '5 minutes ago',
-      severity: 'medium',
-      location: 'Transformer TX1',
-      status: 'Active'
-    },
-    {
-      id: 3,
-      message: 'Circuit breaker CB_400kV is open',
-      time: '8 minutes ago',
-      severity: 'high',
-      location: '400kV Circuit',
-      status: 'Active'
-    },
-    {
-      id: 4,
-      message: 'Power quality degradation detected',
-      time: '12 minutes ago',
-      severity: 'medium',
-      location: '220kV Bus B',
-      status: 'Active'
-    },
-    {
-      id: 5,
-      message: 'Communication timeout with RTU-003',
-      time: '15 minutes ago',
-      severity: 'low',
-      location: 'RTU Network',
-      status: 'Active'
-    },
-    {
-      id: 6,
-      message: 'Harmonic distortion above threshold',
-      time: '18 minutes ago',
-      severity: 'medium',
-      location: 'Main Feeder',
-      status: 'Active'
-    },
-    {
-      id: 7,
-      message: 'Battery backup voltage low',
-      time: '22 minutes ago',
-      severity: 'medium',
-      location: 'DC System',
-      status: 'Active'
-    },
-    {
-      id: 8,
-      message: 'Oil level low in transformer TX2',
-      time: '28 minutes ago',
-      severity: 'high',
-      location: 'Transformer TX2',
-      status: 'Active'
-    }
-  ];
-
-  // Filter alarms based on search and severity
-  const filteredAlarms = allAlarms.filter(alarm => {
-    const matchesSearch = alarm.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          alarm.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSeverity = severityFilter === 'all' || alarm.severity === severityFilter;
-    return matchesSearch && matchesSeverity;
-  });
-
-  // Pagination
-  const totalPages = Math.ceil(filteredAlarms.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedAlarms = filteredAlarms.slice(startIndex, startIndex + itemsPerPage);
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, severityFilter]);
 
   return (
     <SCADAContainer>
@@ -741,110 +648,10 @@ const SCADA = () => {
       <AlarmsSection>
         <SCADASection>
           <SectionTitle>
-            <FiAlertTriangle />
-            Active Alarms ({filteredAlarms.length})
+            <FiSettings />
+            Threshold Configuration
           </SectionTitle>
-
-          <TableControls>
-            <SearchContainer>
-              <SearchIcon />
-              <SearchInput
-                type="text"
-                placeholder="Search alarms..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </SearchContainer>
-
-            <FilterContainer>
-              <FilterButton
-                active={severityFilter === 'all'}
-                onClick={() => setSeverityFilter('all')}
-              >
-                All
-              </FilterButton>
-              <FilterButton
-                active={severityFilter === 'high'}
-                onClick={() => setSeverityFilter('high')}
-              >
-                High
-              </FilterButton>
-              <FilterButton
-                active={severityFilter === 'medium'}
-                onClick={() => setSeverityFilter('medium')}
-              >
-                Medium
-              </FilterButton>
-              <FilterButton
-                active={severityFilter === 'low'}
-                onClick={() => setSeverityFilter('low')}
-              >
-                Low
-              </FilterButton>
-            </FilterContainer>
-          </TableControls>
-
-          {paginatedAlarms.length === 0 ? (
-            <EmptyState>
-              <FiCheckCircle />
-              <p>No alarms found</p>
-            </EmptyState>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <tr>
-                    <TableHeaderCell>Severity</TableHeaderCell>
-                    <TableHeaderCell>Message</TableHeaderCell>
-                    <TableHeaderCell>Location</TableHeaderCell>
-                    <TableHeaderCell>Time</TableHeaderCell>
-                    <TableHeaderCell>Status</TableHeaderCell>
-                  </tr>
-                </TableHeader>
-                <TableBody>
-                  {paginatedAlarms.map((alarm) => (
-                    <TableRow key={alarm.id}>
-                      <TableCell>
-                        <SeverityBadge severity={alarm.severity}>
-                          <FiAlertTriangle />
-                          {alarm.severity}
-                        </SeverityBadge>
-                      </TableCell>
-                      <TableCell>{alarm.message}</TableCell>
-                      <TableCell>{alarm.location}</TableCell>
-                      <TableCell>{alarm.time}</TableCell>
-                      <TableCell>{alarm.status}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              {totalPages > 1 && (
-                <Pagination>
-                  <PaginationInfo>
-                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredAlarms.length)} of {filteredAlarms.length} alarms
-                  </PaginationInfo>
-                  <PaginationControls>
-                    <PaginationButton
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      <FiChevronLeft />
-                    </PaginationButton>
-                    <PageNumber>
-                      Page {currentPage} of {totalPages}
-                    </PageNumber>
-                    <PaginationButton
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      <FiChevronRight />
-                    </PaginationButton>
-                  </PaginationControls>
-                </Pagination>
-              )}
-            </>
-          )}
+          <ThresholdManager />
         </SCADASection>
       </AlarmsSection>
     </SCADAContainer>

@@ -30,6 +30,61 @@ router = APIRouter(prefix="/api/simulation", tags=["simulation"])
 anomaly_simulator = None
 active_anomaly = None
 active_anomaly_task = None
+_load_flow_engine = None  # Reference to the main load flow engine
+
+def set_load_flow_engine(engine):
+    """Set reference to the main load flow engine"""
+    global _load_flow_engine
+    _load_flow_engine = engine
+    logger.info("Load flow engine reference set for anomaly simulation")
+
+def get_active_anomaly():
+    """Get the currently active anomaly"""
+    return active_anomaly
+
+def apply_anomaly_to_metrics(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply active anomaly modifications to metrics"""
+    global active_anomaly
+    if not active_anomaly:
+        return metrics
+
+    try:
+        anomaly_type = active_anomaly.get('type')
+        params = active_anomaly.get('parameters', {})
+
+        # Apply frequency deviation
+        if anomaly_type == 'frequency_deviation':
+            deviation = params.get('deviation', 0.3)
+            freq_type = params.get('type', 'under')
+            if freq_type == 'under':
+                metrics['frequency'] = 50.0 - deviation
+            else:
+                metrics['frequency'] = 50.0 + deviation
+
+        # Apply voltage sag
+        elif anomaly_type == 'voltage_sag':
+            severity = active_anomaly.get('severity', 0.85)
+            metrics['voltage_400kv'] = metrics.get('voltage_400kv', 400) * severity
+            metrics['voltage_220kv'] = metrics.get('voltage_220kv', 220) * severity
+
+        # Apply voltage surge
+        elif anomaly_type == 'voltage_surge':
+            severity = active_anomaly.get('severity', 1.12)
+            metrics['voltage_400kv'] = metrics.get('voltage_400kv', 400) * severity
+            metrics['voltage_220kv'] = metrics.get('voltage_220kv', 220) * severity
+
+        # Apply transformer overload
+        elif anomaly_type == 'overload' or anomaly_type == 'transformer_overload':
+            load_factor = params.get('load_factor', 1.2)
+            metrics['total_load'] = metrics.get('total_load', 0) * load_factor
+            metrics['total_power'] = metrics.get('total_power', 0) * load_factor
+            metrics['efficiency'] = max(0, metrics.get('efficiency', 0) - 25)  # Reduce efficiency
+
+        logger.debug(f"Applied {anomaly_type} anomaly to metrics")
+    except Exception as e:
+        logger.error(f"Error applying anomaly to metrics: {e}")
+
+    return metrics
 
 def get_simulator():
     """Get or create anomaly simulator instance"""
@@ -120,6 +175,27 @@ async def trigger_anomaly(request: AnomalyRequest):
             from src.database import db
             from src.monitoring.alert_service import alert_service
 
+            # Capture current system state
+            system_state = {}
+            try:
+                # Import the global services to get current metrics
+                import src.backend_server as backend
+                if hasattr(backend, 'load_flow_engine') and backend.load_flow_engine:
+                    metrics = backend.load_flow_engine.get_metrics()
+                    system_state = {
+                        'total_power_mw': round(metrics.get('total_power', 0), 2),
+                        'voltage_400kv': round(metrics.get('voltage_400kv', 0), 2),
+                        'voltage_220kv': round(metrics.get('voltage_220kv', 0), 2),
+                        'frequency_hz': round(metrics.get('frequency', 50.0), 2),
+                        'power_factor': round(metrics.get('power_factor', 0), 3),
+                        'efficiency': round(metrics.get('efficiency', 0), 2),
+                        'losses_mw': round(metrics.get('losses', 0), 2),
+                        'generation_mw': round(metrics.get('generation', 0), 2),
+                        'total_load_mw': round(metrics.get('total_load', 0), 2)
+                    }
+            except Exception as state_error:
+                logger.warning(f"Failed to capture system state: {state_error}")
+
             # Create comprehensive alert description
             alert_description = (
                 f"{request.type.replace('_', ' ').title()} at {request.location}\n\n"
@@ -131,7 +207,7 @@ async def trigger_anomaly(request: AnomalyRequest):
             # Store in database
             alert_id = db.store_alert(
                 alert_type='anomaly_simulation',
-                severity=insights.get('severity_level', 'high'),
+                severity='high',  # All anomaly simulations are high severity
                 asset_id=request.location,
                 message=alert_description,
                 data={
@@ -140,7 +216,8 @@ async def trigger_anomaly(request: AnomalyRequest):
                     'severity_value': severity_value,
                     'duration': request.duration,
                     'parameters': request.parameters,
-                    'insights': insights
+                    'insights': insights,
+                    'system_state': system_state  # Add system state at time of anomaly
                 }
             )
 
@@ -225,12 +302,14 @@ async def trigger_anomaly(request: AnomalyRequest):
                 'insights': insights
             }
 
-        # Store active anomaly info for persistence
+        # Store active anomaly info for persistence (use global variable)
+        global active_anomaly
         active_anomaly = {
             'id': anomaly_id,
             'type': request.type,
             'location': request.location,
             'severity': severity_value,
+            'parameters': request.parameters,  # Store parameters for applying anomaly
             'start_time': datetime.now().isoformat()
         }
 

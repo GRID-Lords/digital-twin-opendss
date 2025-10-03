@@ -7,6 +7,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel
 import logging
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -52,16 +53,31 @@ async def get_alerts(
         # Format alerts for frontend
         formatted_alerts = []
         for alert in alerts:
+            # Format timestamp with IST timezone if needed
+            timestamp_str = alert.get('timestamp')
+            if timestamp_str and isinstance(timestamp_str, str):
+                # If timestamp doesn't have timezone info, treat it as IST
+                if '+' not in timestamp_str and 'Z' not in timestamp_str:
+                    # Parse naive timestamp and localize to IST
+                    try:
+                        dt = datetime.fromisoformat(timestamp_str)
+                        ist = pytz.timezone('Asia/Kolkata')
+                        dt_ist = ist.localize(dt)
+                        timestamp_str = dt_ist.isoformat()
+                    except:
+                        pass  # Keep original if parsing fails
+
             formatted_alerts.append({
                 'id': alert.get('id'),
-                'timestamp': alert.get('timestamp'),
+                'timestamp': timestamp_str,
                 'type': alert.get('alert_type'),
                 'severity': alert.get('severity'),
                 'asset_id': alert.get('asset_id'),
                 'description': alert.get('message'),
                 'acknowledged': bool(alert.get('acknowledged')),
                 'resolved': bool(alert.get('resolved')),
-                'duration': None  # Could calculate based on resolution time
+                'duration': None,  # Could calculate based on resolution time
+                'data': alert.get('data')  # Include data field for system state
             })
 
         return {

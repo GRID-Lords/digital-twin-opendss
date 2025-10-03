@@ -38,6 +38,7 @@ from src.api.anomaly_endpoints import router as anomaly_router
 from src.api.asset_endpoints import router as asset_router
 from src.api.historical_endpoints import router as historical_router
 from src.api.alerts_endpoints import router as alerts_router
+from src.api.threshold_endpoints import router as threshold_router
 from src.database import db  # Import database module
 from src.monitoring import alert_service, ai_insights_service
 
@@ -60,6 +61,7 @@ app.include_router(anomaly_router)
 app.include_router(asset_router)
 app.include_router(historical_router)
 app.include_router(alerts_router)
+app.include_router(threshold_router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -126,6 +128,10 @@ async def startup_event():
         # Set services in alerts endpoints
         from src.api.alerts_endpoints import set_services
         set_services(alert_service, ai_insights_service, asset_manager)
+
+        # Set database in threshold endpoints
+        from src.api.threshold_endpoints import set_database
+        set_database(db)
 
         # Initialize SCADA
         scada_config = {
@@ -395,6 +401,15 @@ async def alert_monitoring_loop():
                 if alerts_generated:
                     logger.info(f"Generated {len(alerts_generated)} new alerts")
 
+                # Monitor SCADA data against user-defined thresholds
+                if scada:
+                    from src.monitoring.threshold_monitor import threshold_monitor
+                    scada_data = scada.get_integrated_data()
+                    if scada_data and 'scada_data' in scada_data:
+                        threshold_alerts = await threshold_monitor.check_scada_data(scada_data['scada_data'])
+                        if threshold_alerts:
+                            logger.info(f"Generated {len(threshold_alerts)} threshold alerts")
+
                 # Periodically run AI analysis (every 5 minutes)
                 if not hasattr(alert_monitoring_loop, '_last_ai_analysis'):
                     alert_monitoring_loop._last_ai_analysis = 0
@@ -652,6 +667,13 @@ async def get_current_metrics():
                 metrics["predictions"]["failure_probability"] = max((100 - p.get("predicted_health", 100)) / 100 for p in predictions)
         except Exception as e:
             logger.error(f"Error getting AI predictions: {e}")
+
+    # Apply active anomaly modifications to metrics
+    try:
+        from src.api.anomaly_endpoints import apply_anomaly_to_metrics
+        metrics = apply_anomaly_to_metrics(metrics)
+    except Exception as e:
+        logger.error(f"Error applying anomaly to metrics: {e}")
 
     return metrics
 

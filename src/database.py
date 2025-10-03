@@ -202,11 +202,52 @@ class DigitalTwinDatabase:
                     )
                 ''')
 
+            # Threshold Configuration table for user-defined alert thresholds
+            if self.use_postgres:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS threshold_config (
+                        id SERIAL PRIMARY KEY,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        component_id TEXT NOT NULL,
+                        component_name TEXT NOT NULL,
+                        component_type TEXT NOT NULL,
+                        metric_name TEXT NOT NULL,
+                        metric_unit TEXT,
+                        threshold_min REAL,
+                        threshold_max REAL,
+                        severity TEXT DEFAULT 'medium',
+                        enabled BOOLEAN DEFAULT TRUE,
+                        description TEXT,
+                        UNIQUE(component_id, metric_name)
+                    )
+                ''')
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS threshold_config (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        component_id TEXT NOT NULL,
+                        component_name TEXT NOT NULL,
+                        component_type TEXT NOT NULL,
+                        metric_name TEXT NOT NULL,
+                        metric_unit TEXT,
+                        threshold_min REAL,
+                        threshold_max REAL,
+                        severity TEXT DEFAULT 'medium',
+                        enabled BOOLEAN DEFAULT TRUE,
+                        description TEXT,
+                        UNIQUE(component_id, metric_name)
+                    )
+                ''')
+
             # Create indexes for better query performance
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp DESC)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_asset_states_timestamp ON asset_states(timestamp DESC, asset_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp DESC, severity)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_ai_analysis_timestamp ON ai_analysis(timestamp DESC, analysis_type)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_threshold_config_component ON threshold_config(component_id, enabled)')
 
     def store_metrics(self, metrics: Dict[str, Any]):
         """Store system metrics."""
@@ -427,6 +468,209 @@ class DigitalTwinDatabase:
 
             # Vacuum to reclaim space
             cursor.execute('VACUUM')
+
+    # ===== Threshold Configuration Methods =====
+
+    def create_threshold(self, threshold_data: Dict[str, Any]) -> Optional[int]:
+        """Create a new threshold configuration."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            ph = self.placeholder
+
+            try:
+                if self.use_postgres:
+                    cursor.execute(f'''
+                        INSERT INTO threshold_config (
+                            component_id, component_name, component_type,
+                            metric_name, metric_unit, threshold_min, threshold_max,
+                            severity, enabled, description
+                        ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                        RETURNING id
+                    ''', (
+                        threshold_data['component_id'],
+                        threshold_data['component_name'],
+                        threshold_data['component_type'],
+                        threshold_data['metric_name'],
+                        threshold_data.get('metric_unit', ''),
+                        threshold_data.get('threshold_min'),
+                        threshold_data.get('threshold_max'),
+                        threshold_data.get('severity', 'medium'),
+                        threshold_data.get('enabled', True),
+                        threshold_data.get('description', '')
+                    ))
+                    result = cursor.fetchone()
+                    return result[0] if result else None
+                else:
+                    cursor.execute(f'''
+                        INSERT INTO threshold_config (
+                            component_id, component_name, component_type,
+                            metric_name, metric_unit, threshold_min, threshold_max,
+                            severity, enabled, description
+                        ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    ''', (
+                        threshold_data['component_id'],
+                        threshold_data['component_name'],
+                        threshold_data['component_type'],
+                        threshold_data['metric_name'],
+                        threshold_data.get('metric_unit', ''),
+                        threshold_data.get('threshold_min'),
+                        threshold_data.get('threshold_max'),
+                        threshold_data.get('severity', 'medium'),
+                        threshold_data.get('enabled', True),
+                        threshold_data.get('description', '')
+                    ))
+                    return cursor.lastrowid
+            except Exception as e:
+                logger.error(f"Error creating threshold: {e}")
+                raise
+
+    def get_all_thresholds(self, enabled_only: bool = False) -> List[Dict]:
+        """Get all threshold configurations."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = 'SELECT * FROM threshold_config'
+            params = []
+
+            if enabled_only:
+                query += f' WHERE enabled = {self.placeholder}'
+                params.append(True)
+
+            query += ' ORDER BY component_id, metric_name'
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def get_threshold_by_id(self, threshold_id: int) -> Optional[Dict]:
+        """Get a specific threshold by ID."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f'SELECT * FROM threshold_config WHERE id = {self.placeholder}',
+                (threshold_id,)
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_thresholds_for_component(self, component_id: str) -> List[Dict]:
+        """Get all thresholds for a specific component."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f'SELECT * FROM threshold_config WHERE component_id = {self.placeholder} AND enabled = {self.placeholder}',
+                (component_id, True)
+            )
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def update_threshold(self, threshold_id: int, threshold_data: Dict[str, Any]) -> bool:
+        """Update an existing threshold configuration."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            ph = self.placeholder
+
+            try:
+                update_fields = []
+                params = []
+
+                # Build dynamic UPDATE query based on provided fields
+                for field in ['component_name', 'component_type', 'metric_name', 'metric_unit',
+                             'threshold_min', 'threshold_max', 'severity', 'enabled', 'description']:
+                    if field in threshold_data:
+                        update_fields.append(f'{field} = {ph}')
+                        params.append(threshold_data[field])
+
+                # Always update the updated_at timestamp
+                if self.use_postgres:
+                    update_fields.append('updated_at = CURRENT_TIMESTAMP')
+                else:
+                    update_fields.append('updated_at = CURRENT_TIMESTAMP')
+
+                params.append(threshold_id)
+
+                query = f'''
+                    UPDATE threshold_config
+                    SET {', '.join(update_fields)}
+                    WHERE id = {ph}
+                '''
+
+                cursor.execute(query, params)
+                return cursor.rowcount > 0
+            except Exception as e:
+                logger.error(f"Error updating threshold: {e}")
+                raise
+
+    def delete_threshold(self, threshold_id: int) -> bool:
+        """Delete a threshold configuration."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f'DELETE FROM threshold_config WHERE id = {self.placeholder}',
+                (threshold_id,)
+            )
+            return cursor.rowcount > 0
+
+    def upsert_threshold(self, threshold_data: Dict[str, Any]) -> int:
+        """Create or update threshold (upsert based on component_id + metric_name)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            ph = self.placeholder
+
+            try:
+                if self.use_postgres:
+                    cursor.execute(f'''
+                        INSERT INTO threshold_config (
+                            component_id, component_name, component_type,
+                            metric_name, metric_unit, threshold_min, threshold_max,
+                            severity, enabled, description
+                        ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                        ON CONFLICT (component_id, metric_name)
+                        DO UPDATE SET
+                            component_name = EXCLUDED.component_name,
+                            component_type = EXCLUDED.component_type,
+                            metric_unit = EXCLUDED.metric_unit,
+                            threshold_min = EXCLUDED.threshold_min,
+                            threshold_max = EXCLUDED.threshold_max,
+                            severity = EXCLUDED.severity,
+                            enabled = EXCLUDED.enabled,
+                            description = EXCLUDED.description,
+                            updated_at = CURRENT_TIMESTAMP
+                        RETURNING id
+                    ''', (
+                        threshold_data['component_id'],
+                        threshold_data['component_name'],
+                        threshold_data['component_type'],
+                        threshold_data['metric_name'],
+                        threshold_data.get('metric_unit', ''),
+                        threshold_data.get('threshold_min'),
+                        threshold_data.get('threshold_max'),
+                        threshold_data.get('severity', 'medium'),
+                        threshold_data.get('enabled', True),
+                        threshold_data.get('description', '')
+                    ))
+                    result = cursor.fetchone()
+                    return result[0] if result else None
+                else:
+                    # SQLite: Check if exists, then update or insert
+                    cursor.execute(f'''
+                        SELECT id FROM threshold_config
+                        WHERE component_id = {ph} AND metric_name = {ph}
+                    ''', (threshold_data['component_id'], threshold_data['metric_name']))
+
+                    existing = cursor.fetchone()
+
+                    if existing:
+                        # Update existing
+                        threshold_id = existing[0] if isinstance(existing, tuple) else existing['id']
+                        self.update_threshold(threshold_id, threshold_data)
+                        return threshold_id
+                    else:
+                        # Insert new
+                        return self.create_threshold(threshold_data)
+            except Exception as e:
+                logger.error(f"Error upserting threshold: {e}")
+                raise
 
 # Create global database instance
 db = DigitalTwinDatabase()

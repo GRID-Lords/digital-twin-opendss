@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { FiAlertTriangle, FiInfo, FiCheckCircle, FiXCircle, FiFilter } from 'react-icons/fi';
+import axios from 'axios';
 
 const TableContainer = styled.div`
   background: white;
@@ -172,81 +173,133 @@ const PageButton = styled.button`
   }
 `;
 
-const AlertsTable = () => {
+const ExpandableRow = styled.tr`
+  background: #f8fafc;
+`;
+
+const ExpandedCell = styled.td`
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.8125rem;
+  color: #475569;
+  line-height: 1.6;
+  white-space: pre-wrap;
+`;
+
+const MessageCell = styled(Td)`
+  cursor: pointer;
+
+  &:hover {
+    color: #3b82f6;
+  }
+`;
+
+const AlertsTable = ({ sourceFilter = null }) => {
   const [filter, setFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedAlert, setExpandedAlert] = useState(null);
   const itemsPerPage = 5;
 
-  const allAlerts = [
-    {
-      id: 1,
-      message: 'Transformer TX1 temperature above normal threshold',
-      time: '2 minutes ago',
-      severity: 'medium',
-      type: 'Temperature',
-      icon: FiAlertTriangle
-    },
-    {
-      id: 2,
-      message: 'Circuit breaker CB_400kV status changed to open',
-      time: '5 minutes ago',
-      severity: 'high',
-      type: 'Status Change',
-      icon: FiXCircle
-    },
-    {
-      id: 3,
-      message: 'Load balancing optimization completed successfully',
-      time: '8 minutes ago',
-      severity: 'low',
-      type: 'System',
-      icon: FiCheckCircle
-    },
-    {
-      id: 4,
-      message: 'New IoT device TEMP_SENSOR_001 connected',
-      time: '12 minutes ago',
-      severity: 'low',
-      type: 'Device',
-      icon: FiInfo
-    },
-    {
-      id: 5,
-      message: 'Voltage stability improved to 98.5%',
-      time: '15 minutes ago',
-      severity: 'low',
-      type: 'Performance',
-      icon: FiCheckCircle
-    },
-    {
-      id: 6,
-      message: 'High current detected on Feeder F1',
-      time: '20 minutes ago',
-      severity: 'high',
-      type: 'Overcurrent',
-      icon: FiAlertTriangle
-    },
-    {
-      id: 7,
-      message: 'Protection relay R1 tripped',
-      time: '25 minutes ago',
-      severity: 'high',
-      type: 'Protection',
-      icon: FiXCircle
-    },
-    {
-      id: 8,
-      message: 'Scheduled maintenance completed for Bay 2',
-      time: '30 minutes ago',
-      severity: 'low',
-      type: 'Maintenance',
-      icon: FiInfo
-    }
-  ];
+  useEffect(() => {
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
-  const filteredAlerts = filter === 'all'
-    ? allAlerts
-    : allAlerts.filter(alert => alert.severity === filter);
+  const extractSummary = (fullMessage) => {
+    // Extract just the first line or first sentence before "**Root Cause:**"
+    if (!fullMessage) return 'No description';
+
+    // If message has root cause analysis, extract just the title
+    const rootCauseIndex = fullMessage.indexOf('**Root Cause:**');
+    if (rootCauseIndex > 0) {
+      return fullMessage.substring(0, rootCauseIndex).trim();
+    }
+
+    // Otherwise, take first 100 characters
+    if (fullMessage.length > 100) {
+      return fullMessage.substring(0, 100) + '...';
+    }
+
+    return fullMessage;
+  };
+
+  const fetchAlerts = async () => {
+    try {
+      const response = await axios.get('/api/alerts', {
+        params: {
+          limit: 100,
+          unresolved_only: false
+        }
+      });
+
+      if (response.data && response.data.alerts) {
+        // Format alerts for display
+        const formattedAlerts = response.data.alerts.map(alert => {
+          const fullMessage = alert.description || alert.message || 'No description';
+          return {
+            id: alert.id,
+            message: extractSummary(fullMessage),
+            fullMessage: fullMessage,
+            time: formatTimeAgo(alert.timestamp),
+            timestamp: alert.timestamp,
+            severity: alert.severity || 'medium',
+            type: alert.type || 'System',
+            source: alert.type || 'system',
+            icon: getIconForType(alert.type),
+            data: alert.data
+          };
+        });
+
+        setAlerts(formattedAlerts);
+      }
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getIconForType = (type) => {
+    if (type?.includes('manual_alerts')) return FiAlertTriangle;
+    if (type?.includes('temperature')) return FiAlertTriangle;
+    if (type?.includes('voltage')) return FiXCircle;
+    if (type?.includes('anomaly')) return FiAlertTriangle;
+    return FiInfo;
+  };
+
+  const formatTimeAgo = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    } catch (e) {
+      return 'Unknown';
+    }
+  };
+
+  // Apply both severity filter and source filter (if provided)
+  let filteredAlerts = alerts;
+
+  if (sourceFilter) {
+    filteredAlerts = filteredAlerts.filter(alert => alert.source === sourceFilter);
+  }
+
+  if (filter !== 'all') {
+    filteredAlerts = filteredAlerts.filter(alert => alert.severity === filter);
+  }
 
   const totalPages = Math.ceil(filteredAlerts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -303,21 +356,42 @@ const AlertsTable = () => {
         </Thead>
         <Tbody>
           {currentAlerts.map((alert) => (
-            <Tr key={alert.id}>
-              <Td>
-                <AlertIcon severity={alert.severity}>
-                  <alert.icon />
-                </AlertIcon>
-              </Td>
-              <Td style={{ fontWeight: 500 }}>{alert.message}</Td>
-              <Td style={{ color: '#64748b' }}>{alert.type}</Td>
-              <Td>
-                <SeverityBadge severity={alert.severity}>
-                  {alert.severity}
-                </SeverityBadge>
-              </Td>
-              <Td style={{ color: '#64748b' }}>{alert.time}</Td>
-            </Tr>
+            <React.Fragment key={alert.id}>
+              <Tr>
+                <Td>
+                  <AlertIcon severity={alert.severity}>
+                    <alert.icon />
+                  </AlertIcon>
+                </Td>
+                <MessageCell
+                  style={{ fontWeight: 500 }}
+                  onClick={() => setExpandedAlert(expandedAlert === alert.id ? null : alert.id)}
+                  title="Click to see full details"
+                >
+                  {alert.message}
+                  {alert.fullMessage !== alert.message && expandedAlert !== alert.id && (
+                    <span style={{ color: '#3b82f6', marginLeft: '0.5rem', fontSize: '0.75rem' }}>
+                      (click for details)
+                    </span>
+                  )}
+                </MessageCell>
+                <Td style={{ color: '#64748b' }}>{alert.type}</Td>
+                <Td>
+                  <SeverityBadge severity={alert.severity}>
+                    {alert.severity}
+                  </SeverityBadge>
+                </Td>
+                <Td style={{ color: '#64748b' }}>{alert.time}</Td>
+              </Tr>
+              {expandedAlert === alert.id && alert.fullMessage !== alert.message && (
+                <ExpandableRow>
+                  <ExpandedCell colSpan="5">
+                    <strong>Full Details:</strong>
+                    <div style={{ marginTop: '0.5rem' }}>{alert.fullMessage}</div>
+                  </ExpandedCell>
+                </ExpandableRow>
+              )}
+            </React.Fragment>
           ))}
         </Tbody>
       </Table>

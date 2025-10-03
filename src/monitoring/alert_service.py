@@ -130,6 +130,16 @@ class AlertService:
     ) -> Optional[Dict[str, Any]]:
         """Create an alert with cooldown check"""
 
+        # Check if there's already an active manual_alerts (threshold) alert for this component
+        # to avoid duplicate alerts
+        recent_alerts = db.get_recent_alerts(limit=50, unresolved_only=True)
+        for alert in recent_alerts:
+            # Check if there's a threshold alert for the same component
+            if (alert.get('asset_id') == asset_id and
+                alert.get('alert_type') == 'manual_alerts'):
+                logger.debug(f"Skipping {alert_type} alert for {asset_id} - threshold alert already active")
+                return None
+
         # Check cooldown to prevent duplicate alerts
         cooldown_key = f"{asset_id}:{alert_type}"
         current_time = datetime.now().timestamp()
