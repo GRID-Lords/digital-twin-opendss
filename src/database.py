@@ -1,27 +1,63 @@
 """
 Database module for storing digital twin metrics and historical data.
-Uses SQLite for simplicity - can be upgraded to TimescaleDB or InfluxDB for production.
+Uses PostgreSQL for production-grade storage with SQLite fallback.
 """
 
-import sqlite3
 import json
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import threading
 from contextlib import contextmanager
 
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    POSTGRES_AVAILABLE = False
+    import sqlite3
+
+from src.config import Config
+
+logger = logging.getLogger(__name__)
+
 class DigitalTwinDatabase:
     def __init__(self, db_path: str = "digital_twin.db"):
         self.db_path = db_path
         self.local = threading.local()
+        self.use_postgres = POSTGRES_AVAILABLE and Config.DB_TYPE == 'postgresql'
+
+        if self.use_postgres:
+            logger.info("Using PostgreSQL database")
+            self.conn_params = {
+                'host': Config.DB_HOST,
+                'port': Config.DB_PORT,
+                'database': Config.DB_NAME,
+                'user': Config.DB_USER,
+                'password': Config.DB_PASSWORD
+            }
+        else:
+            logger.info(f"Using SQLite database: {db_path}")
+
         self.init_database()
 
     @contextmanager
     def get_connection(self):
         """Thread-safe database connection."""
-        if not hasattr(self.local, 'connection'):
-            self.local.connection = sqlite3.connect(self.db_path, check_same_thread=False)
-            self.local.connection.row_factory = sqlite3.Row
+        if not hasattr(self.local, 'connection') or self.local.connection is None:
+            if self.use_postgres:
+                try:
+                    self.local.connection = psycopg2.connect(**self.conn_params)
+                except Exception as e:
+                    logger.error(f"PostgreSQL connection failed: {e}, falling back to SQLite")
+                    self.use_postgres = False
+                    self.local.connection = sqlite3.connect(self.db_path, check_same_thread=False)
+                    self.local.connection.row_factory = sqlite3.Row
+            else:
+                self.local.connection = sqlite3.connect(self.db_path, check_same_thread=False)
+                self.local.connection.row_factory = sqlite3.Row
+
         try:
             yield self.local.connection
         except Exception as e:
@@ -31,25 +67,43 @@ class DigitalTwinDatabase:
             self.local.connection.commit()
 
     def init_database(self):
-        """Initialize database tables."""
+        """Initialize database tables - compatible with both PostgreSQL and SQLite."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Metrics table for time-series data
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS metrics (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    total_power REAL,
-                    efficiency REAL,
-                    power_factor REAL,
-                    frequency REAL,
-                    total_load REAL,
-                    generation REAL,
-                    losses REAL,
-                    data JSON
-                )
-            ''')
+            # SQL syntax that works for both PostgreSQL and SQLite
+            if self.use_postgres:
+                # PostgreSQL syntax
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS metrics (
+                        id SERIAL PRIMARY KEY,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        total_power REAL,
+                        efficiency REAL,
+                        power_factor REAL,
+                        frequency REAL,
+                        total_load REAL,
+                        generation REAL,
+                        losses REAL,
+                        data JSONB
+                    )
+                ''')
+            else:
+                # SQLite syntax
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS metrics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        total_power REAL,
+                        efficiency REAL,
+                        power_factor REAL,
+                        frequency REAL,
+                        total_load REAL,
+                        generation REAL,
+                        losses REAL,
+                        data JSON
+                    )
+                ''')
 
             # Assets table for asset states over time
             cursor.execute('''

@@ -208,34 +208,74 @@ async def real_time_data_generator():
             # Generate synthetic SCADA data
             timestamp = datetime.now()
 
-            # Simulate various metrics
-            data = {
-                "timestamp": timestamp.isoformat(),
-                "transformers": {
-                    "T1": {
-                        "load": 85 + np.random.normal(0, 5),
-                        "temperature": 65 + np.random.normal(0, 3),
-                        "oil_level": 95 + np.random.normal(0, 2)
-                    },
-                    "T2": {
-                        "load": 78 + np.random.normal(0, 5),
-                        "temperature": 62 + np.random.normal(0, 3),
-                        "oil_level": 93 + np.random.normal(0, 2)
-                    }
-                },
-                "breakers": {
+            # Get real metrics from assets and load flow
+            transformers_data = {}
+            breakers_data = {}
+            bus_voltages_data = {}
+
+            # Extract transformer data from assets
+            if asset_manager and asset_manager.assets:
+                for asset_id, asset in asset_manager.assets.items():
+                    if 'TR' in asset_id or 'T' in asset_id:
+                        rt_data = asset.real_time_data
+                        transformers_data[asset_id] = {
+                            "load": rt_data.get('loading_percent', 75.0),
+                            "temperature": rt_data.get('temperature_c', asset.thermal.operating_temperature_c),
+                            "oil_level": rt_data.get('oil_level_percent', 95.0)
+                        }
+                    elif 'CB' in asset_id or 'Breaker' in asset_id:
+                        rt_data = asset.real_time_data
+                        breakers_data[asset_id] = {
+                            "status": rt_data.get('status', 'closed'),
+                            "operations": rt_data.get('operations', 1000)
+                        }
+
+            # Get bus voltages from load flow
+            voltage_400kv = 400.0
+            voltage_220kv = 220.0
+            active_power = 350.0
+            reactive_power = 120.0
+            power_factor = 0.95
+
+            if load_flow and load_flow.circuit:
+                try:
+                    flow_results = load_flow.solve()
+                    voltage_400kv = flow_results.get('voltage_400kv', 400.0)
+                    voltage_220kv = flow_results.get('voltage_220kv', 220.0)
+                    active_power = flow_results.get('total_power_kw', 350000) / 1000  # Convert to MW
+                    reactive_power = flow_results.get('total_power_kvar', 120000) / 1000
+                    power_factor = flow_results.get('power_factor', 0.95)
+                except:
+                    pass
+
+            bus_voltages_data = {
+                "400kV": voltage_400kv,
+                "220kV": voltage_220kv
+            }
+
+            # Fallback values if no assets available
+            if not transformers_data:
+                transformers_data = {
+                    "T1": {"load": 85.0, "temperature": 65.0, "oil_level": 95.0},
+                    "T2": {"load": 78.0, "temperature": 62.0, "oil_level": 93.0}
+                }
+
+            if not breakers_data:
+                breakers_data = {
                     "CB1": {"status": "closed", "operations": 1250},
                     "CB2": {"status": "closed", "operations": 980},
                     "CB3": {"status": "open", "operations": 1100}
-                },
-                "bus_voltages": {
-                    "400kV": 398.5 + np.random.normal(0, 1),
-                    "220kV": 219.2 + np.random.normal(0, 0.5)
-                },
+                }
+
+            data = {
+                "timestamp": timestamp.isoformat(),
+                "transformers": transformers_data,
+                "breakers": breakers_data,
+                "bus_voltages": bus_voltages_data,
                 "power_flow": {
-                    "active_power": 350 + np.random.normal(0, 10),
-                    "reactive_power": 120 + np.random.normal(0, 5),
-                    "power_factor": 0.95 + np.random.normal(0, 0.02)
+                    "active_power": active_power,
+                    "reactive_power": reactive_power,
+                    "power_factor": power_factor
                 }
             }
 
@@ -364,54 +404,102 @@ async def alert_monitoring_loop():
             logger.error(f"Error in alert monitoring loop: {e}")
             await asyncio.sleep(60)
 
+async def run_opendss_and_update_assets():
+    """Run OpenDSS power flow and update asset real-time data"""
+    if not load_flow or not load_flow.dss:
+        return None
+
+    try:
+        # Solve power flow
+        flow_results = load_flow.solve()
+
+        if not flow_results.get('converged', False):
+            logger.warning("OpenDSS power flow did not converge")
+            return flow_results
+
+        # Update assets with OpenDSS results
+        if asset_manager and load_flow.circuit:
+            # Get bus voltages
+            bus_names = load_flow.circuit.buses_names()
+            for bus_name in bus_names:
+                load_flow.circuit.set_active_bus(bus_name)
+                v_pu = load_flow.circuit.buses.pu_vmag_angle()
+                kv_base = load_flow.circuit.buses.kv_base()
+
+                if v_pu and len(v_pu) > 0:
+                    kv_actual = v_pu[0] * kv_base
+
+                    # Update assets connected to this bus
+                    for asset_id, asset in asset_manager.assets.items():
+                        if bus_name.lower() in asset.location.lower() or bus_name in asset_id:
+                            asset.real_time_data['voltage_kv'] = kv_actual
+
+            # Get line/transformer currents and loadings
+            element_names = load_flow.circuit.allElement_names()
+            for elem_name in element_names:
+                if 'transformer' in elem_name.lower():
+                    load_flow.circuit.set_active_element(elem_name)
+                    currents = load_flow.circuit.cktelement.currents()
+                    powers = load_flow.circuit.cktelement.powers()
+
+                    # Find matching asset
+                    for asset_id, asset in asset_manager.assets.items():
+                        if 'TR' in asset_id or 'T' in asset_id:
+                            if currents and len(currents) > 0:
+                                asset.real_time_data['current_a'] = abs(currents[0])
+                            if powers and len(powers) > 0:
+                                asset.real_time_data['power_mw'] = abs(powers[0]) / 1000
+                                # Calculate loading percentage
+                                rated_power = asset.electrical.rated_power_mva * 1000  # Convert to kW
+                                loading_pct = (abs(powers[0]) / rated_power) * 100
+                                asset.real_time_data['loading_percent'] = min(100, loading_pct)
+
+        return flow_results
+
+    except Exception as e:
+        logger.error(f"Error running OpenDSS: {e}")
+        return None
+
 async def get_current_metrics():
-    """Get current system metrics from real asset and power flow data"""
+    """Get current system metrics from real OpenDSS power flow data"""
     timestamp = datetime.now()
 
-    # Calculate real metrics from assets
-    if asset_manager and asset_manager.assets:
-        # Calculate total power from transformer loadings
-        total_power = 0
-        transformer_count = 0
-        total_health = 0
-        asset_count = 0
+    # Run OpenDSS and update assets
+    flow_results = await run_opendss_and_update_assets()
 
+    # Calculate real metrics from OpenDSS results and assets
+    total_power = 0
+    total_health = 0
+    asset_count = 0
+
+    if asset_manager and asset_manager.assets:
         for asset_id, asset in asset_manager.assets.items():
             # Sum health scores
             total_health += asset.health.overall_health
             asset_count += 1
 
-            # Calculate power from transformers
+            # Get power from transformer real-time data (updated from OpenDSS)
             if 'TR' in asset_id:
                 rt_data = asset.real_time_data
-                voltage = rt_data.get('voltage_kv', asset.electrical.voltage_rating_kv)
-                current = rt_data.get('current_a', asset.electrical.current_rating_a * 0.7)
-                power_mw = (voltage * current * 1.732) / 1000  # 3-phase power in MW
-                total_power += power_mw
-                transformer_count += 1
+                power_mw = rt_data.get('power_mw', 0)
+                if power_mw > 0:
+                    total_power += power_mw
 
         # Calculate average system health from all assets
-        system_health = total_health / asset_count if asset_count > 0 else 0
-
-        # If no transformers have real data, use a reasonable estimate
-        if total_power == 0:
-            total_power = 350  # Fallback value
+        system_health = total_health / asset_count if asset_count > 0 else 95
 
     else:
         # Fallback if asset manager not available
         total_power = 350
         system_health = 95
 
-    # Get power factor and frequency from load flow if available
-    if load_flow and load_flow.circuit:
-        try:
-            flow_results = load_flow.solve()
-            power_factor = flow_results.get('power_factor', 0.95)
-            # Calculate losses from load flow
-            losses_mw = flow_results.get('total_losses_mw', total_power * 0.03)
-        except:
-            power_factor = 0.95
-            losses_mw = total_power * 0.03
+    # Use OpenDSS results from flow_results
+    if flow_results:
+        power_factor = flow_results.get('power_factor', 0.95)
+        losses_mw = flow_results.get('total_losses_mw', total_power * 0.03)
+        total_power_kw = flow_results.get('total_power_kw', 0)
+        if total_power_kw > 0:
+            total_power = total_power_kw / 1000  # Convert kW to MW
     else:
         power_factor = 0.95
         losses_mw = total_power * 0.03
@@ -461,14 +549,38 @@ async def get_current_metrics():
 
         current_time = time.time()
         if current_time - get_current_metrics._last_power_flow_store >= 60:  # 60 seconds
+            # Get actual bus voltages from load flow or assets
+            voltage_400kv = 400.0
+            voltage_220kv = 220.0
+
+            if load_flow and load_flow.circuit:
+                try:
+                    flow_results = load_flow.solve()
+                    voltage_400kv = flow_results.get('voltage_400kv', 400.0)
+                    voltage_220kv = flow_results.get('voltage_220kv', 220.0)
+                except:
+                    pass
+
+            # Fallback to asset real-time data if available
+            if asset_manager and asset_manager.assets:
+                for asset_id, asset in asset_manager.assets.items():
+                    rt_data = asset.real_time_data
+                    if 'voltage_kv' in rt_data:
+                        v = rt_data['voltage_kv']
+                        # Categorize by voltage level
+                        if v > 300:  # 400kV bus
+                            voltage_400kv = v
+                        elif v > 100:  # 220kV bus
+                            voltage_220kv = v
+
             timeseries_db.insert_power_flow({
                 'active_power': active_power,
                 'reactive_power': reactive_power,
                 'apparent_power': apparent_power,
                 'power_factor': power_factor,
                 'frequency': metrics['frequency'],
-                'voltage_400kv': 400 + np.random.normal(0, 2),
-                'voltage_220kv': 220 + np.random.normal(0, 1.5)
+                'voltage_400kv': voltage_400kv,
+                'voltage_220kv': voltage_220kv
             }, timestamp)
             get_current_metrics._last_power_flow_store = current_time
             logger.debug("Stored power flow data to timeseries database")
@@ -478,23 +590,32 @@ async def get_current_metrics():
     # Add AI predictions if available
     if ai_manager:
         try:
-            # Generate sample current data for health degradation prediction
-            current_data = {
-                "PowerTransformer_T1": {
-                    "voltage": 400 + np.random.normal(0, 5),
-                    "current": 200 + np.random.normal(0, 10),
-                    "power": total_power * 0.6,
-                    "temperature": 65 + np.random.normal(0, 5),
-                    "health_score": 85 + np.random.normal(0, 3)
-                },
-                "DistributionTransformer_T2": {
-                    "voltage": 220 + np.random.normal(0, 3),
-                    "current": 150 + np.random.normal(0, 8),
-                    "power": total_power * 0.4,
-                    "temperature": 60 + np.random.normal(0, 5),
-                    "health_score": 82 + np.random.normal(0, 3)
+            # Get real asset data for health degradation prediction
+            current_data = {}
+
+            if asset_manager and asset_manager.assets:
+                for asset_id, asset in asset_manager.assets.items():
+                    if 'TR' in asset_id or 'T' in asset_id:  # Transformers
+                        rt_data = asset.real_time_data
+                        current_data[asset_id] = {
+                            "voltage": rt_data.get('voltage_kv', asset.electrical.voltage_rating_kv),
+                            "current": rt_data.get('current_a', asset.electrical.current_rating_a * 0.7),
+                            "power": rt_data.get('power_mw', 0),
+                            "temperature": rt_data.get('temperature_c', asset.thermal.operating_temperature_c),
+                            "health_score": asset.health.overall_health
+                        }
+
+            # Fallback if no assets available
+            if not current_data:
+                current_data = {
+                    "PowerTransformer_T1": {
+                        "voltage": 400.0,
+                        "current": 200.0,
+                        "power": total_power * 0.6,
+                        "temperature": 65.0,
+                        "health_score": 85.0
+                    }
                 }
-            }
 
             # Use actual AI manager method via predictive_model
             predictions = ai_manager.predictive_model.predict_health_degradation(current_data)
@@ -564,13 +685,10 @@ def calculate_health_score(asset_type: str, temperature: float, load_percent: fl
         age_penalty = min(25, (age_years / expected_life) * 25)
         ops_penalty = 0
 
-    # Calculate final health score
+    # Calculate final health score (deterministic based on actual conditions)
     health = base_health - temp_penalty - load_penalty - age_penalty - ops_penalty
 
-    # Add small random variation for realism (±1%)
-    health += np.random.uniform(-1, 1)
-
-    return max(0, min(100, health))
+    return max(0, min(100, round(health, 2)))
 
 # DEPRECATED - Using asset_endpoints.py instead
 # The old get_assets function has been replaced with asset_endpoints.py
