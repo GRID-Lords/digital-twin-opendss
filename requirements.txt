@@ -1,5 +1,6 @@
 # OpenDSS Interface and Simulation
 opendssdirect.py>=0.9.1
+py_dss_interface>=2.0.3
 
 # Visualization and Network Analysis
 networkx>=3.0
