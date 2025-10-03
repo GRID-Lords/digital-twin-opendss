@@ -220,16 +220,17 @@ New Monitor.PowerMonitor220kV Element=Transformer.TX1_400_220 Terminal=2 mode=1 
 ! ============================================================================
 ! 11. FAULT ANALYSIS SETUP
 ! ============================================================================
-! Fault impedance for short circuit analysis
+! Fault impedance for short circuit analysis (disabled by default)
+! To enable faults for analysis, set Enabled=Yes
 New Fault.Fault400kV phases=3
 ~ Bus1=Bus400kV_1.1.2.3.0
 ~ Bus2=Bus400kV_1.0.0.0
-~ ON=0
+~ Enabled=No
 
 New Fault.Fault220kV phases=3
 ~ Bus1=Bus220kV_1.1.2.3.0
 ~ Bus2=Bus220kV_1.0.0.0
-~ ON=0
+~ Enabled=No
 
 ! ============================================================================
 ! 12. SOLVE THE CIRCUIT
