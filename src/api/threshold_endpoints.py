@@ -344,10 +344,14 @@ async def initialize_default_thresholds():
         created_count = 0
         for threshold_data in default_thresholds:
             try:
-                _db.upsert_threshold(threshold_data)
-                created_count += 1
+                result = _db.upsert_threshold(threshold_data)
+                if result:
+                    created_count += 1
+                    logger.info(f"Created threshold {threshold_data['component_id']}/{threshold_data['metric_name']}: ID={result}")
+                else:
+                    logger.error(f"Failed to create threshold {threshold_data['component_id']}/{threshold_data['metric_name']}: No ID returned")
             except Exception as e:
-                logger.warning(f"Failed to create default threshold for {threshold_data['component_id']}: {e}")
+                logger.error(f"Failed to create default threshold for {threshold_data['component_id']}: {e}", exc_info=True)
 
         return {
             'success': True,

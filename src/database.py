@@ -499,7 +499,10 @@ class DigitalTwinDatabase:
                         threshold_data.get('description', '')
                     ))
                     result = cursor.fetchone()
-                    return result[0] if result else None
+                    if result:
+                        # psycopg2 RealDict cursor returns dict-like objects
+                        return result['id'] if isinstance(result, dict) or hasattr(result, '__getitem__') and 'id' in result else result[0]
+                    return None
                 else:
                     cursor.execute(f'''
                         INSERT INTO threshold_config (
@@ -619,6 +622,7 @@ class DigitalTwinDatabase:
 
             try:
                 if self.use_postgres:
+                    logger.debug(f"Upserting threshold for {threshold_data.get('component_id')}/{threshold_data.get('metric_name')}")
                     cursor.execute(f'''
                         INSERT INTO threshold_config (
                             component_id, component_name, component_type,
@@ -650,7 +654,11 @@ class DigitalTwinDatabase:
                         threshold_data.get('description', '')
                     ))
                     result = cursor.fetchone()
-                    return result[0] if result else None
+                    if result:
+                        # psycopg2 RealDict cursor returns dict-like objects
+                        threshold_id = result['id'] if isinstance(result, dict) or hasattr(result, '__getitem__') and 'id' in result else result[0]
+                        return threshold_id
+                    return None
                 else:
                     # SQLite: Check if exists, then update or insert
                     cursor.execute(f'''

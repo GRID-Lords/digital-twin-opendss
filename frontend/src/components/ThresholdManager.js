@@ -287,12 +287,14 @@ const ThresholdManager = () => {
 
   return (
     <ManagerContainer>
-      <ControlsRow>
-        <InitButton onClick={handleInitializeDefaults}>
-          <FiPlus />
-          Initialize Default Thresholds
-        </InitButton>
-      </ControlsRow>
+      {thresholds.length === 0 && (
+        <ControlsRow>
+          <InitButton onClick={handleInitializeDefaults}>
+            <FiPlus />
+            Initialize Default Thresholds
+          </InitButton>
+        </ControlsRow>
+      )}
 
       {thresholds.length === 0 ? (
         <EmptyState>
