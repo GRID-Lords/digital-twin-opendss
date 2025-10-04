@@ -9,107 +9,167 @@ import AnomalySimulationPanel from '../components/AnomalySimulationPanel';
 const VisualizationContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
 `;
 
 const PageHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  padding: 1.5rem;
+  border-radius: 12px;
 `;
 
 const Title = styled.h1`
-  color: #f1f5f9;
-  font-size: 2rem;
-  font-weight: 600;
+  color: #2563eb;
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  svg {
+    font-size: 2rem;
+  }
 `;
 
 const ControlButtons = styled.div`
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
 `;
 
 const ControlButton = styled.button`
-  background: ${props => props.active ? 'rgba(99, 102, 241, 0.8)' : '#334155'};
-  border: 1px solid ${props => props.active ? '#6366f1' : '#475569'};
-  color: #f1f5f9;
-  padding: 0.75rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  background: #2563eb;
+  padding: 0.625rem 1rem;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
 
   &:hover {
-    background: ${props => props.active ? 'rgba(99, 102, 241, 0.9)' : '#475569'};
-  }
-`;
-
-const TabButtons = styled.div`
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 0;
-`;
-
-const TabButton = styled.button`
-  background: ${props => props.active ? 'rgba(99, 102, 241, 0.8)' : '#334155'};
-  border: 1px solid ${props => props.active ? '#6366f1' : '#475569'};
-  color: #f1f5f9;
-  padding: 1rem 2rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  font-weight: ${props => props.active ? '600' : '400'};
-
-  &:hover {
-    background: ${props => props.active ? 'rgba(99, 102, 241, 0.9)' : '#475569'};
-    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
   }
 
   svg {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
   }
 `;
 
-const VisualizationWrapper = styled.div`
-  background: #1e293b;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-  padding: 2rem;
-  min-height: 600px;
+const ContentGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 1.25rem;
+
+  @media (max-width: 1400px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const MainContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 `;
 
 const InfoBar = styled.div`
-  display: flex;
-  justify-content: space-around;
-  background: #1e293b;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 2rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
 `;
 
 const InfoItem = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
 `;
 
 const InfoLabel = styled.span`
-  color: #94a3b8;
-  font-size: 0.9rem;
-  margin-bottom: 0.5rem;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 `;
 
 const InfoValue = styled.span`
-  color: #f1f5f9;
+  color: #1e40af;
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 700;
+`;
+
+const TabButtons = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  background: #ffffff;
+  padding: 0.75rem;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+`;
+
+const TabButton = styled.button`
+  flex: 1;
+  background: ${props => props.active ? 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' : '#f8fafc'};
+  border: 1px solid ${props => props.active ? '#2563eb' : '#e2e8f0'};
+  color: ${props => props.active ? '#ffffff' : '#475569'};
+  padding: 0.875rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: ${props => props.active ? '600' : '500'};
+  box-shadow: ${props => props.active ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'};
+
+  &:hover {
+    background: ${props => props.active ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)' : '#f1f5f9'};
+    transform: translateY(-1px);
+  }
+
+  svg {
+    font-size: 1.15rem;
+  }
+`;
+
+const VisualizationWrapper = styled.div`
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  height: fit-content;
+`;
+
+const SidePanel = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  @media (max-width: 1400px) {
+    width: 100%;
+  }
 `;
 
 const Visualization = () => {
@@ -247,16 +307,22 @@ const Visualization = () => {
   return (
     <VisualizationContainer>
       <PageHeader>
-        <Title>Substation Visualization & Control</Title>
+        <Title>
+          <FiMonitor />
+          Substation Visualization & Control
+        </Title>
         <ControlButtons>
-          <ControlButton onClick={handleRefresh} title="Refresh">
+          <ControlButton onClick={handleRefresh} title="Refresh Data">
             <FiRefreshCw />
+            Refresh
           </ControlButton>
-          <ControlButton onClick={handleExport} title="Export">
+          <ControlButton onClick={handleExport} title="Export Image">
             <FiDownload />
+            Export
           </ControlButton>
-          <ControlButton onClick={handleFullscreen} title="Fullscreen">
+          <ControlButton onClick={handleFullscreen} title="Fullscreen Mode">
             <FiMaximize2 />
+            Fullscreen
           </ControlButton>
         </ControlButtons>
       </PageHeader>
@@ -280,32 +346,38 @@ const Visualization = () => {
         </InfoItem>
       </InfoBar>
 
-      <TabButtons>
-        <TabButton
-          active={viewMode === '2D'}
-          onClick={() => setViewMode('2D')}
-        >
-          <FiGrid />
-          2D Single-Line Diagram
-        </TabButton>
-        <TabButton
-          active={viewMode === '3D'}
-          onClick={() => setViewMode('3D')}
-        >
-          <FiCpu />
-          3D Substation Model
-        </TabButton>
-      </TabButtons>
+      <ContentGrid>
+        <MainContent>
+          <TabButtons>
+            <TabButton
+              active={viewMode === '2D'}
+              onClick={() => setViewMode('2D')}
+            >
+              <FiGrid />
+              2D Diagram
+            </TabButton>
+            <TabButton
+              active={viewMode === '3D'}
+              onClick={() => setViewMode('3D')}
+            >
+              <FiCpu />
+              3D Model
+            </TabButton>
+          </TabButtons>
 
-      <VisualizationWrapper ref={visualizationRef}>
-        {viewMode === '2D' ? (
-          <SubstationVisualization2D activeAnomalies={activeAnomalies} />
-        ) : (
-          <SubstationVisualization3D activeAnomalies={activeAnomalies} />
-        )}
-      </VisualizationWrapper>
+          <VisualizationWrapper ref={visualizationRef}>
+            {viewMode === '2D' ? (
+              <SubstationVisualization2D activeAnomalies={activeAnomalies} />
+            ) : (
+              <SubstationVisualization3D activeAnomalies={activeAnomalies} />
+            )}
+          </VisualizationWrapper>
+        </MainContent>
 
-      <AnomalySimulationPanel onAnomalyChange={setActiveAnomalies} />
+        <SidePanel>
+          <AnomalySimulationPanel onAnomalyChange={setActiveAnomalies} />
+        </SidePanel>
+      </ContentGrid>
     </VisualizationContainer>
   );
 };

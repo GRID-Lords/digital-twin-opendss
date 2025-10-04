@@ -62,6 +62,46 @@ services:
     networks:
       - digitaltwin-network
 
+  # Backend - FastAPI application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: digitaltwin-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=redis
+      - INFLUX_HOST=influxdb
+      - POSTGRES_HOST=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    networks:
+      - digitaltwin-network
+
+  # Frontend - React application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: digitaltwin-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - digitaltwin-network
+
 
 networks:
   digitaltwin-network:

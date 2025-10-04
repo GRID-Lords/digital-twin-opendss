@@ -5,176 +5,209 @@ import toast from 'react-hot-toast';
 import { AlertCircle, Zap, Thermometer, Activity, Shield, Power } from 'lucide-react';
 
 const Container = styled.div`
-  background: #1e293b;
-  border-radius: 12px;
-  padding: 2rem;
-  margin-top: 2rem;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  height: 900px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 `;
 
 const Title = styled.h2`
-  color: #f1f5f9;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
+  color: #1f2937;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 
   svg {
-    color: #ef4444;
+    width: 18px;
+    height: 18px;
+    color: #3b82f6;
   }
 `;
 
 const Description = styled.p`
-  color: #94a3b8;
-  margin-bottom: 2rem;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  color: #6b7280;
+  margin-bottom: 1rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
 `;
 
 const ScenariosGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+
+  /* Hide scrollbar but keep scrollability */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 `;
 
 const ScenarioCard = styled.div`
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 1.5rem;
-  transition: all 0.3s;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.85rem;
+  transition: all 0.2s;
 
   &:hover {
-    border-color: #6366f1;
-    transform: translateY(-2px);
+    border-color: #3b82f6;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
   }
 `;
 
 const ScenarioHeader = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
 `;
 
 const ScenarioIcon = styled.div`
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: ${props => props.color}20;
+  background: ${props => props.color}15;
+  flex-shrink: 0;
 
   svg {
-    width: 24px;
-    height: 24px;
+    width: 16px;
+    height: 16px;
     color: ${props => props.color};
   }
 `;
 
 const ScenarioInfo = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
 const ScenarioName = styled.h3`
-  color: #f1f5f9;
-  font-size: 1.1rem;
+  color: #1f2937;
+  font-size: 0.875rem;
   font-weight: 600;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.1rem;
 `;
 
 const ScenarioType = styled.div`
   color: #64748b;
-  font-size: 0.875rem;
+  font-size: 0.7rem;
 `;
 
 const ScenarioDescription = styled.p`
-  color: #94a3b8;
-  font-size: 0.875rem;
-  margin-bottom: 1rem;
-  line-height: 1.4;
+  display: none;
 `;
 
 const ParametersSection = styled.div`
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
+  background: #f9fafb;
+  padding: 0.6rem;
+  border-radius: 5px;
+  border: 1px solid #e5e7eb;
 `;
 
 const ParameterRow = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.4rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 `;
 
 const ParameterLabel = styled.label`
-  color: #94a3b8;
-  font-size: 0.875rem;
+  color: #4b5563;
+  font-size: 0.7rem;
+  font-weight: 500;
 `;
 
 const ParameterInput = styled.input`
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
-  color: #f1f5f9;
-  padding: 0.25rem 0.5rem;
-  width: 100px;
-  font-size: 0.875rem;
+  color: #1f2937;
+  padding: 0.2rem 0.4rem;
+  width: 70px;
+  font-size: 0.7rem;
 
   &:focus {
     outline: none;
-    border-color: #6366f1;
+    border-color: #3b82f6;
   }
 `;
 
 const ParameterSelect = styled.select`
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
-  color: #f1f5f9;
-  padding: 0.25rem 0.5rem;
-  width: 120px;
-  font-size: 0.875rem;
+  color: #1f2937;
+  padding: 0.2rem 0.4rem;
+  width: 85px;
+  font-size: 0.7rem;
 
   &:focus {
     outline: none;
-    border-color: #6366f1;
+    border-color: #3b82f6;
   }
 `;
 
 const SimulateButton = styled.button`
   width: 100%;
-  background: ${props => props.isRunning ? '#ef4444' : '#6366f1'};
+  background: ${props => props.isRunning ?
+    'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' :
+    'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'};
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 0.75rem;
-  font-size: 0.9rem;
-  font-weight: 500;
+  border-radius: 5px;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: ${props => props.isRunning ?
+    '0 1px 3px rgba(239, 68, 68, 0.2)' :
+    '0 1px 3px rgba(59, 130, 246, 0.2)'};
 
   &:hover:not(:disabled) {
-    background: ${props => props.isRunning ? '#dc2626' : '#4f46e5'};
+    transform: translateY(-1px);
+    box-shadow: ${props => props.isRunning ?
+      '0 2px 4px rgba(239, 68, 68, 0.3)' :
+      '0 2px 4px rgba(59, 130, 246, 0.3)'};
   }
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
   }
 `;
 
 const StatusMessage = styled.div`
-  background: ${props => props.type === 'error' ? '#dc262620' : '#10b98120'};
-  border: 1px solid ${props => props.type === 'error' ? '#dc2626' : '#10b981'};
+  background: ${props => props.type === 'error' ? '#fef2f2' : '#f0fdf4'};
+  border: 1px solid ${props => props.type === 'error' ? '#fca5a5' : '#86efac'};
   border-radius: 6px;
-  padding: 1rem;
-  margin-top: 1.5rem;
-  color: ${props => props.type === 'error' ? '#fca5a5' : '#86efac'};
-  font-size: 0.875rem;
+  padding: 0.75rem;
+  margin-top: 1rem;
+  color: ${props => props.type === 'error' ? '#dc2626' : '#16a34a'};
+  font-size: 0.75rem;
+  font-weight: 500;
 `;
 
 const AnomalySimulationPanel = () => {
@@ -395,9 +428,9 @@ const AnomalySimulationPanel = () => {
       <SimulateButton
         onClick={clearAllAnomalies}
         isRunning={true}
-        style={{ marginTop: '1.5rem', maxWidth: '400px', margin: '1.5rem auto 0' }}
+        style={{ marginTop: '0.5rem' }}
       >
-        🔧 Go Back to Normal - Clear All Anomalies
+        🔧 Clear All Anomalies
       </SimulateButton>
 
       {statusMessage && (
