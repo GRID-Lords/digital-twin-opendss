@@ -36,3 +36,5 @@ models/
 
 # Archived documentation
 .archived_docs/
+
+frontend/build/

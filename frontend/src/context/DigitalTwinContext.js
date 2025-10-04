@@ -46,7 +46,77 @@ export const DigitalTwinProvider = ({ children }) => {
             console.log('WebSocket message received:', new Date().toLocaleTimeString(), data);
 
             // Handle different message types
-            if (data.type === 'update') {
+            if (data.type === 'alert_notification') {
+              // Show toast notification for new alerts
+              const alert = data.alert;
+              const notificationType = data.notification_type;
+
+              // Create toast with appropriate styling based on notification type
+              if (notificationType === 'critical') {
+                toast.error(
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      🚨 Critical Anomaly Detected
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                      {alert.message}
+                    </div>
+                  </div>,
+                  {
+                    duration: 8000,
+                    style: {
+                      background: '#fef2f2',
+                      border: '1px solid #fca5a5',
+                      borderLeft: '4px solid #dc2626',
+                      maxWidth: '500px'
+                    }
+                  }
+                );
+              } else if (notificationType === 'medium') {
+                toast(
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      ⚠️ New Alert
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                      {alert.message}
+                    </div>
+                  </div>,
+                  {
+                    duration: 6000,
+                    style: {
+                      background: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      borderLeft: '4px solid #f59e0b',
+                      maxWidth: '500px'
+                    }
+                  }
+                );
+              } else {
+                // Default info toast
+                toast(
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      ℹ️ Alert
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                      {alert.message}
+                    </div>
+                  </div>,
+                  {
+                    duration: 5000,
+                    style: {
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      borderLeft: '4px solid #3b82f6',
+                      maxWidth: '500px'
+                    }
+                  }
+                );
+              }
+
+              console.log('Alert notification displayed:', alert);
+            } else if (data.type === 'update') {
               setAssets(data.assets || {});
               setMetrics(data.metrics || {});
               console.log('Updated assets and metrics via WebSocket');

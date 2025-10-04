@@ -53,19 +53,22 @@ async def get_alerts(
         # Format alerts for frontend
         formatted_alerts = []
         for alert in alerts:
-            # Format timestamp with IST timezone if needed
+            # Format timestamp with IST timezone - database stores in UTC
             timestamp_str = alert.get('timestamp')
             if timestamp_str and isinstance(timestamp_str, str):
-                # If timestamp doesn't have timezone info, treat it as IST
+                # If timestamp doesn't have timezone info, treat it as UTC and convert to IST
                 if '+' not in timestamp_str and 'Z' not in timestamp_str:
-                    # Parse naive timestamp and localize to IST
                     try:
-                        dt = datetime.fromisoformat(timestamp_str)
+                        # Parse as UTC timestamp
+                        dt_utc = datetime.fromisoformat(timestamp_str)
+                        utc = pytz.timezone('UTC')
                         ist = pytz.timezone('Asia/Kolkata')
-                        dt_ist = ist.localize(dt)
+                        # Localize as UTC first, then convert to IST
+                        dt_utc = utc.localize(dt_utc)
+                        dt_ist = dt_utc.astimezone(ist)
                         timestamp_str = dt_ist.isoformat()
-                    except:
-                        pass  # Keep original if parsing fails
+                    except Exception as e:
+                        logger.error(f"Failed to convert timestamp to IST: {e}", exc_info=True)
 
             formatted_alerts.append({
                 'id': alert.get('id'),

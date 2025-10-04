@@ -153,12 +153,17 @@ start_local() {
     echo -e "${GREEN}✓ Backend started (PID: $BACKEND_PID)${NC}"
 
     # Wait for backend
-    sleep 5
+    echo -e "${YELLOW}Waiting for backend to be ready...${NC}"
+    for i in {1..30}; do
+        if curl -s http://localhost:8000/health >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ Backend is healthy${NC}"
+            break
+        fi
+        sleep 1
+    done
 
-    # Check if backend is running
-    if curl -s http://localhost:8000/health >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ Backend is healthy${NC}"
-    else
+    # Final health check
+    if ! curl -s http://localhost:8000/health >/dev/null 2>&1; then
         echo -e "${RED}✗ Backend failed to start. Check logs/backend.log${NC}"
         exit 1
     fi

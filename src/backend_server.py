@@ -379,6 +379,10 @@ async def websocket_broadcaster():
 
 async def alert_monitoring_loop():
     """Monitor assets and generate alerts"""
+    # Track last alert IDs to detect new alerts
+    if not hasattr(alert_monitoring_loop, '_last_alert_ids'):
+        alert_monitoring_loop._last_alert_ids = set()
+
     while True:
         try:
             if asset_manager and alert_service:
@@ -398,8 +402,12 @@ async def alert_monitoring_loop():
                 # Monitor and generate alerts
                 alerts_generated = await alert_service.monitor_assets(assets_dict)
 
+                # Collect all new alerts for broadcasting
+                new_alerts_to_broadcast = []
+
                 if alerts_generated:
                     logger.info(f"Generated {len(alerts_generated)} new alerts")
+                    new_alerts_to_broadcast.extend(alerts_generated)
 
                 # Monitor SCADA data against user-defined thresholds
                 if scada:
@@ -409,6 +417,31 @@ async def alert_monitoring_loop():
                         threshold_alerts = await threshold_monitor.check_scada_data(scada_data['scada_data'])
                         if threshold_alerts:
                             logger.info(f"Generated {len(threshold_alerts)} threshold alerts")
+                            new_alerts_to_broadcast.extend(threshold_alerts)
+
+                # Broadcast new alerts via WebSocket
+                if new_alerts_to_broadcast:
+                    for alert in new_alerts_to_broadcast:
+                        # Determine notification type based on alert type and severity
+                        is_anomaly = alert.get('alert_type', '').startswith('anomaly_')
+                        notification_type = 'critical' if is_anomaly else 'medium'
+
+                        notification_message = {
+                            'type': 'alert_notification',
+                            'notification_type': notification_type,
+                            'alert': {
+                                'id': alert.get('id'),
+                                'message': alert.get('message'),
+                                'severity': alert.get('severity'),
+                                'alert_type': alert.get('alert_type'),
+                                'asset_id': alert.get('asset_id'),
+                                'timestamp': alert.get('timestamp')
+                            }
+                        }
+
+                        # Broadcast to all connected clients
+                        await manager.broadcast(notification_message)
+                        logger.info(f"Broadcasted {notification_type} alert notification: {alert.get('message', '')[:50]}")
 
                 # Periodically run AI analysis (every 5 minutes)
                 if not hasattr(alert_monitoring_loop, '_last_ai_analysis'):

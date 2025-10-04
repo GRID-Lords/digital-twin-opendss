@@ -10,6 +10,7 @@ from datetime import datetime
 import asyncio
 import json
 import logging
+import pytz
 
 import sys
 from pathlib import Path
@@ -45,21 +46,27 @@ def get_active_anomaly():
 def apply_anomaly_to_metrics(metrics: Dict[str, Any]) -> Dict[str, Any]:
     """Apply active anomaly modifications to metrics"""
     global active_anomaly
+    logger.info(f"🔍 apply_anomaly_to_metrics called, active_anomaly: {active_anomaly}")
+
     if not active_anomaly:
+        logger.info("No active anomaly, returning metrics unchanged")
         return metrics
 
     try:
         anomaly_type = active_anomaly.get('type')
         params = active_anomaly.get('parameters', {})
+        logger.info(f"Applying anomaly type: {anomaly_type}, params: {params}")
 
         # Apply frequency deviation
         if anomaly_type == 'frequency_deviation':
             deviation = params.get('deviation', 0.3)
             freq_type = params.get('type', 'under')
+            # Get current frequency (which has normal variations) and apply deviation
+            current_freq = metrics.get('frequency', 50.0)
             if freq_type == 'under':
-                metrics['frequency'] = 50.0 - deviation
+                metrics['frequency'] = current_freq - deviation
             else:
-                metrics['frequency'] = 50.0 + deviation
+                metrics['frequency'] = current_freq + deviation
 
         # Apply voltage sag
         elif anomaly_type == 'voltage_sag':
@@ -180,8 +187,11 @@ async def trigger_anomaly(request: AnomalyRequest):
             try:
                 # Import the global services to get current metrics
                 import src.backend_server as backend
-                if hasattr(backend, 'load_flow_engine') and backend.load_flow_engine:
-                    metrics = backend.load_flow_engine.get_metrics()
+                logger.info(f"Capturing system state: backend module loaded, hasattr load_flow: {hasattr(backend, 'load_flow')}")
+                if hasattr(backend, 'load_flow') and backend.load_flow:
+                    logger.info("load_flow found, calling get_metrics()")
+                    metrics = backend.load_flow.get_metrics()
+                    logger.info(f"Metrics retrieved: {list(metrics.keys())}")
                     system_state = {
                         'total_power_mw': round(metrics.get('total_power', 0), 2),
                         'voltage_400kv': round(metrics.get('voltage_400kv', 0), 2),
@@ -193,8 +203,11 @@ async def trigger_anomaly(request: AnomalyRequest):
                         'generation_mw': round(metrics.get('generation', 0), 2),
                         'total_load_mw': round(metrics.get('total_load', 0), 2)
                     }
+                    logger.info(f"System state captured: {system_state}")
+                else:
+                    logger.warning("load_flow not found or is None")
             except Exception as state_error:
-                logger.warning(f"Failed to capture system state: {state_error}")
+                logger.error(f"Failed to capture system state: {state_error}", exc_info=True)
 
             # Create comprehensive alert description
             alert_description = (
@@ -222,6 +235,27 @@ async def trigger_anomaly(request: AnomalyRequest):
             )
 
             logger.info(f"Alert stored for anomaly: {anomaly_id}, DB Alert ID: {alert_id}")
+
+            # Broadcast anomaly alert via WebSocket with critical notification
+            try:
+                import src.backend_server as backend
+                if hasattr(backend, 'manager'):
+                    notification_message = {
+                        'type': 'alert_notification',
+                        'notification_type': 'critical',  # Anomalies are always critical
+                        'alert': {
+                            'id': alert_id,
+                            'message': f"{request.type.replace('_', ' ').title()} at {request.location}",
+                            'severity': 'critical',
+                            'alert_type': 'anomaly_simulation',
+                            'asset_id': request.location,
+                            'timestamp': datetime.now().isoformat()
+                        }
+                    }
+                    await backend.manager.broadcast(notification_message)
+                    logger.info(f"Broadcasted critical anomaly notification via WebSocket")
+            except Exception as ws_error:
+                logger.warning(f"Failed to broadcast anomaly via WebSocket: {ws_error}")
 
         except Exception as db_error:
             logger.warning(f"Failed to store alert in database: {db_error}")
@@ -302,8 +336,7 @@ async def trigger_anomaly(request: AnomalyRequest):
                 'insights': insights
             }
 
-        # Store active anomaly info for persistence (use global variable)
-        global active_anomaly
+        # Store active anomaly info for persistence (use global variable from function start)
         active_anomaly = {
             'id': anomaly_id,
             'type': request.type,
@@ -312,6 +345,7 @@ async def trigger_anomaly(request: AnomalyRequest):
             'parameters': request.parameters,  # Store parameters for applying anomaly
             'start_time': datetime.now().isoformat()
         }
+        logger.info(f"🔥 Active anomaly SET: {active_anomaly}")
 
         # NOTE: Auto-clear disabled - user must manually clear via /clear endpoint
         # asyncio.create_task(clear_anomaly_after_delay(
@@ -374,14 +408,16 @@ async def run_scenario(request: SimulationScenarioRequest):
 @router.get("/status", response_model=SimulationStatusResponse)
 async def get_simulation_status():
     """Get current simulation status and active anomalies"""
+    global active_anomaly
     try:
         simulator = get_simulator()
 
         # Get current system state
         system_state = simulator._capture_system_state()
 
-        # Get list of active anomalies (would need tracking in production)
-        active_anomalies = []  # This would be maintained in a real system
+        # Get list of active anomalies from global variable
+        active_anomalies = [active_anomaly] if active_anomaly else []
+        logger.info(f"🔍 Status endpoint: active_anomaly = {active_anomaly}")
 
         return SimulationStatusResponse(
             active_anomalies=active_anomalies,
