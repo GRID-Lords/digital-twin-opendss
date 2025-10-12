@@ -14,6 +14,9 @@ New Circuit.IndianEHVSubstation phases=3 BasekV=400 pu=1.00 angle=0
 ! Set Indian voltage bases
 Set VoltageBases=[400 220 132 33 11 0.415]
 
+! Set Indian grid frequency to 50 Hz (NOT 60 Hz like US)
+Set DefaultBaseFreq=50
+
 ! ============================================================================
 ! 2. TRANSMISSION SYSTEM - 400 kV GRID CONNECTION
 ! ============================================================================
