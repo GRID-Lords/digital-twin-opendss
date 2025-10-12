@@ -257,16 +257,20 @@ class TrendCalculator:
             trend: TrendData object
 
         Returns:
-            Formatted string (e.g., "+2.3%" or "−0.5%" or "stable")
+            Formatted string (e.g., "+2.3456%" or "−0.5678%" or "±0.0%")
         """
         if not trend.is_significant:
-            return "±0.0%"
+            # Still show the actual value even if not significant
+            sign = "+" if trend.percentage_change > 0 else ("−" if trend.percentage_change < 0 else "±")
+            value = abs(trend.percentage_change)
+            return f"{sign}{value:.4f}%"
 
         # Use proper minus sign (−) instead of hyphen (-)
         sign = "+" if trend.percentage_change > 0 else "−"
         value = abs(trend.percentage_change)
 
-        return f"{sign}{value:.1f}%"
+        # Show up to 4 decimal places for precision
+        return f"{sign}{value:.4f}%"
 
     def get_trend_color(self, trend: TrendData, metric_name: str) -> str:
         """

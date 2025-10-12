@@ -1216,11 +1216,11 @@ async def get_metrics():
                     # Add trend information to metrics
                     trends[metric_name] = {
                         'value': trend_calc.format_trend_display(trend),
-                        'percentage': round(trend.percentage_change, 2),
+                        'percentage': round(trend.percentage_change, 6),  # Keep 6 decimals
                         'direction': trend.trend_direction,
                         'is_significant': trend.is_significant,
                         'previous_value': trend.previous_value,
-                        'absolute_change': round(trend.absolute_change, 4)
+                        'absolute_change': round(trend.absolute_change, 6)  # Keep 6 decimals
                     }
 
             metrics['trends'] = trends
