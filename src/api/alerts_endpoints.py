@@ -38,6 +38,14 @@ class AlertAcknowledgeRequest(BaseModel):
 class AlertResolveRequest(BaseModel):
     alert_id: int
 
+class AlertAssigneeRequest(BaseModel):
+    alert_id: int
+    assignee: str
+
+class AlertStatusRequest(BaseModel):
+    alert_id: int
+    status: str
+
 @router.get("/alerts")
 async def get_alerts(
     limit: int = Query(100, description="Number of alerts to fetch"),
@@ -79,6 +87,8 @@ async def get_alerts(
                 'description': alert.get('message'),
                 'acknowledged': bool(alert.get('acknowledged')),
                 'resolved': bool(alert.get('resolved')),
+                'assignee': alert.get('assignee'),
+                'status': alert.get('status', 'pending'),
                 'duration': None,  # Could calculate based on resolution time
                 'data': alert.get('data')  # Include data field for system state
             })
@@ -129,6 +139,46 @@ async def resolve_alert(request: AlertResolveRequest):
 
     except Exception as e:
         logger.error(f"Error resolving alert: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/alerts/assign")
+async def assign_alert(request: AlertAssigneeRequest):
+    """Assign an alert to a person"""
+    try:
+        if _alert_service is None:
+            raise HTTPException(status_code=503, detail="Alert service not initialized")
+
+        _alert_service.update_alert_assignee(request.alert_id, request.assignee)
+
+        return {
+            'success': True,
+            'message': f'Alert {request.alert_id} assigned to {request.assignee}',
+            'alert_id': request.alert_id,
+            'assignee': request.assignee
+        }
+
+    except Exception as e:
+        logger.error(f"Error assigning alert: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/alerts/status")
+async def update_alert_status(request: AlertStatusRequest):
+    """Update alert status"""
+    try:
+        if _alert_service is None:
+            raise HTTPException(status_code=503, detail="Alert service not initialized")
+
+        _alert_service.update_alert_status(request.alert_id, request.status)
+
+        return {
+            'success': True,
+            'message': f'Alert {request.alert_id} status updated to {request.status}',
+            'alert_id': request.alert_id,
+            'status': request.status
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating alert status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/anomaly/trigger")

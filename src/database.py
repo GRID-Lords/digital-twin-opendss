@@ -156,6 +156,8 @@ class DigitalTwinDatabase:
                         message TEXT,
                         acknowledged BOOLEAN DEFAULT FALSE,
                         resolved BOOLEAN DEFAULT FALSE,
+                        assignee TEXT,
+                        status TEXT DEFAULT 'pending',
                         data JSONB
                     )
                 ''')
@@ -170,6 +172,8 @@ class DigitalTwinDatabase:
                         message TEXT,
                         acknowledged BOOLEAN DEFAULT FALSE,
                         resolved BOOLEAN DEFAULT FALSE,
+                        assignee TEXT,
+                        status TEXT DEFAULT 'pending',
                         data JSON
                     )
                 ''')
@@ -242,12 +246,47 @@ class DigitalTwinDatabase:
                     )
                 ''')
 
+            # DSS File Versions table for versioning DSS files
+            if self.use_postgres:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS dss_file_versions (
+                        id SERIAL PRIMARY KEY,
+                        version_number INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        created_by TEXT DEFAULT 'system',
+                        description TEXT,
+                        is_active BOOLEAN DEFAULT FALSE,
+                        file_hash TEXT,
+                        component_count INTEGER,
+                        validation_status TEXT DEFAULT 'valid',
+                        validation_errors TEXT
+                    )
+                ''')
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS dss_file_versions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        version_number INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        created_by TEXT DEFAULT 'system',
+                        description TEXT,
+                        is_active BOOLEAN DEFAULT FALSE,
+                        file_hash TEXT,
+                        component_count INTEGER,
+                        validation_status TEXT DEFAULT 'valid',
+                        validation_errors TEXT
+                    )
+                ''')
+
             # Create indexes for better query performance
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp DESC)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_asset_states_timestamp ON asset_states(timestamp DESC, asset_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp DESC, severity)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_ai_analysis_timestamp ON ai_analysis(timestamp DESC, analysis_type)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_threshold_config_component ON threshold_config(component_id, enabled)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_dss_versions_active ON dss_file_versions(is_active, created_at DESC)')
 
     def store_metrics(self, metrics: Dict[str, Any]):
         """Store system metrics."""
@@ -463,9 +502,36 @@ class DigitalTwinDatabase:
             cursor = conn.cursor()
             ph = self.placeholder
             cursor.execute(f'''
-                UPDATE alerts SET resolved = TRUE
+                UPDATE alerts SET resolved = TRUE, status = 'resolved'
                 WHERE id = {ph}
             ''', (alert_id,))
+
+    def update_alert_assignee(self, alert_id: int, assignee: str):
+        """Update the assignee for an alert."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            ph = self.placeholder
+            cursor.execute(f'''
+                UPDATE alerts SET assignee = {ph}
+                WHERE id = {ph}
+            ''', (assignee, alert_id))
+
+    def update_alert_status(self, alert_id: int, status: str):
+        """Update the status of an alert."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            ph = self.placeholder
+            # Also update resolved flag if status is 'resolved'
+            if status == 'resolved':
+                cursor.execute(f'''
+                    UPDATE alerts SET status = {ph}, resolved = TRUE
+                    WHERE id = {ph}
+                ''', (status, alert_id))
+            else:
+                cursor.execute(f'''
+                    UPDATE alerts SET status = {ph}
+                    WHERE id = {ph}
+                ''', (status, alert_id))
 
     def get_aggregated_metrics(self, hours: int = 24, interval_minutes: int = 60) -> List[Dict]:
         """Get aggregated metrics over time intervals."""
@@ -731,6 +797,115 @@ class DigitalTwinDatabase:
                         return self.create_threshold(threshold_data)
             except Exception as e:
                 logger.error(f"Error upserting threshold: {e}")
+                raise
+
+    # ===== DSS File Version Methods =====
+
+    def create_dss_version(self, content: str, created_by: str = 'user', description: str = '') -> Optional[int]:
+        """Create a new DSS file version."""
+        import hashlib
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            ph = self.placeholder
+
+            try:
+                # Calculate file hash
+                file_hash = hashlib.sha256(content.encode()).hexdigest()
+
+                # Count components (lines starting with "New ")
+                component_count = len([line for line in content.split('\n') if line.strip().startswith('New ')])
+
+                # Get next version number
+                cursor.execute('SELECT MAX(version_number) FROM dss_file_versions')
+                result = cursor.fetchone()
+                next_version = (result[0] if result and result[0] is not None else 0) + 1
+
+                # Deactivate all previous versions
+                cursor.execute('UPDATE dss_file_versions SET is_active = FALSE')
+
+                # Insert new version
+                if self.use_postgres:
+                    cursor.execute(f'''
+                        INSERT INTO dss_file_versions (
+                            version_number, content, created_by, description,
+                            is_active, file_hash, component_count, validation_status
+                        ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                        RETURNING id
+                    ''', (next_version, content, created_by, description, True, file_hash, component_count, 'valid'))
+                    result = cursor.fetchone()
+                    return result['id'] if isinstance(result, dict) or hasattr(result, '__getitem__') and 'id' in result else result[0]
+                else:
+                    cursor.execute(f'''
+                        INSERT INTO dss_file_versions (
+                            version_number, content, created_by, description,
+                            is_active, file_hash, component_count, validation_status
+                        ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    ''', (next_version, content, created_by, description, True, file_hash, component_count, 'valid'))
+                    return cursor.lastrowid
+            except Exception as e:
+                logger.error(f"Error creating DSS version: {e}")
+                raise
+
+    def get_active_dss_version(self) -> Optional[Dict]:
+        """Get the currently active DSS file version."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM dss_file_versions
+                WHERE is_active = TRUE
+                ORDER BY created_at DESC
+                LIMIT 1
+            ''')
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_all_dss_versions(self, limit: int = 50) -> List[Dict]:
+        """Get all DSS file versions."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f'''
+                SELECT id, version_number, created_at, created_by, description,
+                       is_active, file_hash, component_count, validation_status,
+                       LENGTH(content) as content_size
+                FROM dss_file_versions
+                ORDER BY version_number DESC
+                LIMIT {self.placeholder}
+            ''', (limit,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def get_dss_version_by_id(self, version_id: int) -> Optional[Dict]:
+        """Get a specific DSS file version by ID."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f'''
+                SELECT * FROM dss_file_versions
+                WHERE id = {self.placeholder}
+            ''', (version_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def activate_dss_version(self, version_id: int) -> bool:
+        """Activate a specific DSS file version."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            ph = self.placeholder
+
+            try:
+                # Deactivate all versions
+                cursor.execute('UPDATE dss_file_versions SET is_active = FALSE')
+
+                # Activate the specified version
+                cursor.execute(f'''
+                    UPDATE dss_file_versions
+                    SET is_active = TRUE
+                    WHERE id = {ph}
+                ''', (version_id,))
+
+                return cursor.rowcount > 0
+            except Exception as e:
+                logger.error(f"Error activating DSS version: {e}")
                 raise
 
 # Create global database instance

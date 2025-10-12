@@ -167,7 +167,7 @@ class LoadFlowAnalysis:
         """Run load flow analysis using actual OpenDSS"""
         if not self.dss:
             # Return fallback values if OpenDSS not initialized
-            logger.warning("OpenDSS not initialized, returning fallback values")
+            logger.warning("⚠️ OpenDSS not initialized, returning fallback values (NOT REAL DATA)")
             return {
                 "converged": True,
                 "iterations": 5,
@@ -176,7 +176,10 @@ class LoadFlowAnalysis:
                 "total_losses_mw": 3.2,
                 "power_factor": 0.95,
                 "voltage_400kv": 400.0,
-                "voltage_220kv": 220.0
+                "voltage_220kv": 220.0,
+                "frequency": 50.0,
+                "total_power_kw": 0,
+                "total_power_kvar": 0
             }
 
         try:
@@ -247,6 +250,14 @@ class LoadFlowAnalysis:
             else:
                 power_factor = 0.95
 
+            # Get actual frequency from OpenDSS solution
+            try:
+                frequency = self.dss.Solution.Frequency()
+                logger.debug(f"Frequency from OpenDSS: {frequency} Hz")
+            except Exception as e:
+                logger.warning(f"Could not get frequency from OpenDSS, using default 50 Hz: {e}")
+                frequency = 50.0
+
             result = {
                 "converged": converged,
                 "iterations": iterations,
@@ -257,12 +268,13 @@ class LoadFlowAnalysis:
                 "voltage_400kv": voltage_400kv,
                 "voltage_220kv": voltage_220kv,
                 "total_power_kw": total_power_kw,
-                "total_power_kvar": total_power_kvar
+                "total_power_kvar": total_power_kvar,
+                "frequency": frequency
             }
-            logger.info(f"OpenDSS solved: converged={converged}, total_power_kw={total_power_kw:.2f}, v400={voltage_400kv:.2f}, v220={voltage_220kv:.2f}")
+            logger.info(f"OpenDSS solved: converged={converged}, total_power_kw={total_power_kw:.2f}, v400={voltage_400kv:.2f}, v220={voltage_220kv:.2f}, freq={frequency:.2f} Hz")
             return result
         except Exception as e:
-            logger.error(f"Error solving load flow: {e}")
+            logger.error(f"⚠️ Error solving load flow: {e} - Returning fallback values (NOT REAL DATA)")
             # Return safe fallback values
             return {
                 "converged": False,
@@ -272,7 +284,10 @@ class LoadFlowAnalysis:
                 "total_losses_mw": 3.2,
                 "power_factor": 0.95,
                 "voltage_400kv": 400.0,
-                "voltage_220kv": 220.0
+                "voltage_220kv": 220.0,
+                "frequency": 50.0,
+                "total_power_kw": 0,
+                "total_power_kvar": 0
             }
 
     def run_contingency_analysis(self) -> List[Dict]:

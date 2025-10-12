@@ -11,6 +11,7 @@ import AnomalyDetail from './pages/AnomalyDetail';
 import Visualization from './pages/Visualization';
 import Logging from './pages/Logging';
 import Trends from './pages/Trends';
+import DSSEditor from './pages/DSSEditor';
 import { DigitalTwinProvider } from './context/DigitalTwinContext';
 
 const GlobalStyle = createGlobalStyle`
@@ -175,6 +176,7 @@ function App() {
                 <Route path="/visualization" element={<Visualization />} />
                 <Route path="/logging" element={<Logging />} />
                 <Route path="/trends" element={<Trends />} />
+                <Route path="/dss-editor" element={<DSSEditor />} />
               </Routes>
             </Content>
           </MainContent>

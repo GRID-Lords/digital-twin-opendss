@@ -106,12 +106,11 @@ export const scadaAPI = {
 // Simulation APIs
 export const simulationAPI = {
   // Trigger anomaly simulation
-  triggerAnomaly: async (type, severity, location, duration) => {
+  triggerAnomaly: async (type, severity, location) => {
     const response = await axios.post('/api/simulation/anomaly', {
       type,
       severity,
-      location,
-      duration
+      location
     });
     return response.data;
   },

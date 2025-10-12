@@ -28,6 +28,8 @@ from visualization.circuit_visualizer import OpenDSSVisualizer
 from models.ai_ml_models import SubstationAIManager
 from integration.scada_integration import SCADAIntegrationManager
 from simulation.load_flow import LoadFlowAnalysis
+from database import db
+from utils.dss_validator import validate_dss_file_changes, DSSValidator
 import matplotlib
 matplotlib.use('Agg', force=True)
 
@@ -148,48 +150,112 @@ class IndianEHVSubstationDigitalTwin:
             # Start SCADA integration
             self.scada_manager.start_integration()
 
+            # Initialize DSS file versioning in database
+            self._initialize_dss_versioning()
+
             logger.info("Digital Twin initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize digital twin: {e}")
             raise
-    
+
+    def _initialize_dss_versioning(self):
+        """Initialize DSS file versioning - create first version if none exists"""
+        try:
+            # Check if any versions exist
+            active_version = db.get_active_dss_version()
+            if not active_version:
+                # No versions exist, create the first one from the original file
+                if self.dss_file.exists():
+                    logger.info("No DSS versions found, creating initial version from file...")
+                    original_content = self.dss_file.read_text()
+                    version_id = db.create_dss_version(
+                        content=original_content,
+                        created_by='system',
+                        description='Initial version from original DSS file'
+                    )
+                    logger.info(f"Created initial DSS version with ID {version_id}")
+                else:
+                    logger.warning(f"DSS file not found at {self.dss_file}")
+            else:
+                logger.info(f"Active DSS version found: v{active_version['version_number']}")
+        except Exception as e:
+            logger.error(f"Error initializing DSS versioning: {e}")
+            # Non-fatal error, continue with initialization
+
     def _setup_assets(self):
-        """Setup asset monitoring for all substation components"""
+        """Setup asset monitoring for all substation components with real OpenDSS data"""
+        # Get initial values from OpenDSS results
+        voltage_400kv = self.opendss_results.get('voltage_400kv', 400.0)
+        voltage_220kv = self.opendss_results.get('voltage_220kv', 220.0)
+        total_power_kw = abs(self.opendss_results.get('total_power_kw', 0))
+        converged = self.opendss_results.get('converged', True)
+
+        logger.info(f"Initializing assets with OpenDSS data: V400={voltage_400kv:.2f} kV, V220={voltage_220kv:.2f} kV, Power={total_power_kw:.2f} kW")
+
         # Grid connection
         self.assets["Grid400kV"] = AssetStatus(
             asset_id="Grid400kV", asset_type="GridConnection",
-            status="healthy", voltage=400.0, current=0.0, power=0.0,
+            status="healthy" if converged else "warning",
+            voltage=voltage_400kv,
+            current=total_power_kw / (voltage_400kv * 1.732) if voltage_400kv > 0 else 0,
+            power=total_power_kw / 1000.0,  # Convert to MW
             temperature=25.0, timestamp=datetime.now().isoformat(),
             health_score=100.0
         )
         
-        # Main transformers
+        # Main transformers - Initialize with OpenDSS data
+        tx_power_kw = total_power_kw / 2.0  # Split between two transformers
+        tx_current = tx_power_kw / (voltage_400kv * 1.732) if voltage_400kv > 0 else 0
+        load_factor = tx_power_kw / 315000.0  # 315 MVA rated
+        tx_temp = 45.0 + (load_factor * 25.0)  # Temperature based on loading
+
         self.assets["TX1_400_220"] = AssetStatus(
             asset_id="TX1_400_220", asset_type="PowerTransformer",
-            status="healthy", voltage=400.0, current=0.0, power=0.0,
-            temperature=45.0, timestamp=datetime.now().isoformat(),
+            status="healthy" if converged else "warning",
+            voltage=voltage_400kv,
+            current=tx_current,
+            power=tx_power_kw,
+            temperature=tx_temp,
+            timestamp=datetime.now().isoformat(),
             health_score=95.0
         )
-        
+
         self.assets["TX2_400_220"] = AssetStatus(
             asset_id="TX2_400_220", asset_type="PowerTransformer",
-            status="healthy", voltage=400.0, current=0.0, power=0.0,
-            temperature=45.0, timestamp=datetime.now().isoformat(),
+            status="healthy" if converged else "warning",
+            voltage=voltage_400kv,
+            current=tx_current,
+            power=tx_power_kw,
+            temperature=tx_temp,
+            timestamp=datetime.now().isoformat(),
             health_score=95.0
         )
-        
-        # Distribution transformers
+
+        # Distribution transformers - Initialize with OpenDSS data
+        dtx_power_kw = total_power_kw / 4.0  # Distribute among distribution transformers
+        dtx_current = dtx_power_kw / (voltage_220kv * 1.732) if voltage_220kv > 0 else 0
+        dtx_load_factor = dtx_power_kw / 50000.0  # 50 MVA rated
+        dtx_temp = 50.0 + (dtx_load_factor * 20.0)
+
         self.assets["DTX1_220_33"] = AssetStatus(
             asset_id="DTX1_220_33", asset_type="DistributionTransformer",
-            status="healthy", voltage=220.0, current=0.0, power=0.0,
-            temperature=50.0, timestamp=datetime.now().isoformat(),
+            status="healthy" if converged else "warning",
+            voltage=voltage_220kv,
+            current=dtx_current,
+            power=dtx_power_kw,
+            temperature=dtx_temp,
+            timestamp=datetime.now().isoformat(),
             health_score=90.0
         )
-        
+
         self.assets["DTX2_220_33"] = AssetStatus(
             asset_id="DTX2_220_33", asset_type="DistributionTransformer",
-            status="healthy", voltage=220.0, current=0.0, power=0.0,
-            temperature=50.0, timestamp=datetime.now().isoformat(),
+            status="healthy" if converged else "warning",
+            voltage=voltage_220kv,
+            current=dtx_current,
+            power=dtx_power_kw,
+            temperature=dtx_temp,
+            timestamp=datetime.now().isoformat(),
             health_score=90.0
         )
         
@@ -202,18 +268,30 @@ class IndianEHVSubstationDigitalTwin:
                 health_score=98.0
             )
         
-        # Loads
+        # Loads - Initialize with real DSS file values (15 MW and 12 MW as defined in DSS)
+        load1_power_kw = 15000.0  # From DSS file
+        load2_power_kw = 12000.0  # From DSS file
+        load_voltage_kv = 33.0    # From DSS file
+
         self.assets["IndustrialLoad1"] = AssetStatus(
             asset_id="IndustrialLoad1", asset_type="IndustrialLoad",
-            status="healthy", voltage=33.0, current=0.0, power=15000.0,
-            temperature=35.0, timestamp=datetime.now().isoformat(),
+            status="healthy",
+            voltage=load_voltage_kv,
+            current=load1_power_kw / (load_voltage_kv * 1.732),
+            power=load1_power_kw,
+            temperature=35.0 + (load1_power_kw / 20000.0 * 10.0),  # Temperature based on power
+            timestamp=datetime.now().isoformat(),
             health_score=85.0
         )
-        
+
         self.assets["IndustrialLoad2"] = AssetStatus(
             asset_id="IndustrialLoad2", asset_type="IndustrialLoad",
-            status="healthy", voltage=33.0, current=0.0, power=12000.0,
-            temperature=35.0, timestamp=datetime.now().isoformat(),
+            status="healthy",
+            voltage=load_voltage_kv,
+            current=load2_power_kw / (load_voltage_kv * 1.732),
+            power=load2_power_kw,
+            temperature=35.0 + (load2_power_kw / 20000.0 * 10.0),  # Temperature based on power
+            timestamp=datetime.now().isoformat(),
             health_score=85.0
         )
     
@@ -602,6 +680,35 @@ class IndianEHVSubstationDigitalTwin:
         """Get fault analysis history"""
         return [asdict(fault) for fault in self.faults]
 
+    def reload_dss_file(self, new_content: str = None):
+        """Reload DSS file from content or active version in database"""
+        try:
+            if new_content:
+                # Write content to temporary file and reload
+                temp_dss_path = self.dss_file.parent / "temp_circuit.dss"
+                temp_dss_path.write_text(new_content)
+                self.load_flow.load_circuit(str(temp_dss_path))
+                logger.info("Reloaded DSS file from provided content")
+            else:
+                # Reload from the active version in database
+                active_version = db.get_active_dss_version()
+                if active_version:
+                    temp_dss_path = self.dss_file.parent / "active_circuit.dss"
+                    temp_dss_path.write_text(active_version['content'])
+                    self.load_flow.load_circuit(str(temp_dss_path))
+                    logger.info(f"Reloaded DSS file from version {active_version['version_number']}")
+                else:
+                    # Fallback to original file
+                    self.load_flow.load_circuit(str(self.dss_file))
+                    logger.info("Reloaded DSS file from original file")
+
+            # Re-run solve to update state
+            self.opendss_results = self.load_flow.solve()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to reload DSS file: {e}")
+            return False
+
 # ============================================================================
 # FASTAPI APPLICATION
 # ============================================================================
@@ -815,6 +922,181 @@ async def get_iot_device_data(device_id: str):
         data = digital_twin.scada_manager.iot_manager.get_device_data(device_id)
         return data
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# DSS FILE MANAGEMENT ENDPOINTS
+# ============================================================================
+
+class DSSFileRequest(BaseModel):
+    """Request model for DSS file operations"""
+    content: str
+    description: Optional[str] = ""
+    created_by: Optional[str] = "user"
+
+class DSSValidateRequest(BaseModel):
+    """Request model for DSS file validation"""
+    content: str
+
+@app.get("/api/dss/current")
+async def get_current_dss():
+    """Get currently active DSS file content"""
+    try:
+        # Try to get from database first
+        active_version = db.get_active_dss_version()
+        if active_version:
+            return {
+                "content": active_version['content'],
+                "version_id": active_version['id'],
+                "version_number": active_version['version_number'],
+                "created_at": active_version['created_at'],
+                "description": active_version.get('description', ''),
+                "is_active": True
+            }
+
+        # Fallback to reading from file
+        dss_file_path = digital_twin.dss_file
+        if dss_file_path.exists():
+            content = dss_file_path.read_text()
+            return {
+                "content": content,
+                "version_id": None,
+                "version_number": 0,
+                "created_at": None,
+                "description": "Original file",
+                "is_active": True
+            }
+        else:
+            raise HTTPException(status_code=404, detail="DSS file not found")
+    except Exception as e:
+        logger.error(f"Error getting current DSS file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/dss/validate")
+async def validate_dss(request: DSSValidateRequest):
+    """Validate DSS file changes without saving"""
+    try:
+        # Get current/original content
+        active_version = db.get_active_dss_version()
+        if active_version:
+            original_content = active_version['content']
+        else:
+            original_content = digital_twin.dss_file.read_text()
+
+        # Validate changes
+        validation_result = validate_dss_file_changes(original_content, request.content)
+
+        return {
+            "valid": validation_result['valid'],
+            "errors": validation_result['errors'],
+            "warnings": validation_result['warnings'],
+            "message": validation_result['message']
+        }
+    except Exception as e:
+        logger.error(f"Error validating DSS file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/dss/save")
+async def save_dss_version(request: DSSFileRequest):
+    """Save a new version of the DSS file after validation"""
+    try:
+        # Get current/original content for validation
+        active_version = db.get_active_dss_version()
+        if active_version:
+            original_content = active_version['content']
+        else:
+            original_content = digital_twin.dss_file.read_text()
+
+        # Validate changes
+        validation_result = validate_dss_file_changes(original_content, request.content)
+
+        if not validation_result['valid']:
+            return {
+                "success": False,
+                "errors": validation_result['errors'],
+                "warnings": validation_result['warnings'],
+                "message": "Validation failed. Cannot save invalid DSS file."
+            }
+
+        # Save new version to database
+        version_id = db.create_dss_version(
+            content=request.content,
+            created_by=request.created_by,
+            description=request.description
+        )
+
+        # Reload the DSS file in the simulation
+        reload_success = digital_twin.reload_dss_file(request.content)
+
+        if not reload_success:
+            logger.warning("DSS file saved but failed to reload in simulation")
+
+        return {
+            "success": True,
+            "version_id": version_id,
+            "warnings": validation_result['warnings'],
+            "message": "DSS file saved successfully",
+            "reload_status": "success" if reload_success else "failed"
+        }
+    except Exception as e:
+        logger.error(f"Error saving DSS file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/dss/versions")
+async def get_dss_versions(limit: int = 50):
+    """Get all DSS file versions"""
+    try:
+        versions = db.get_all_dss_versions(limit=limit)
+        return {
+            "versions": versions,
+            "total": len(versions)
+        }
+    except Exception as e:
+        logger.error(f"Error getting DSS versions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/dss/versions/{version_id}")
+async def get_dss_version(version_id: int):
+    """Get a specific DSS file version by ID"""
+    try:
+        version = db.get_dss_version_by_id(version_id)
+        if not version:
+            raise HTTPException(status_code=404, detail=f"Version {version_id} not found")
+        return version
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting DSS version {version_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/dss/activate/{version_id}")
+async def activate_dss_version(version_id: int):
+    """Activate a specific DSS file version"""
+    try:
+        # Get the version
+        version = db.get_dss_version_by_id(version_id)
+        if not version:
+            raise HTTPException(status_code=404, detail=f"Version {version_id} not found")
+
+        # Activate in database
+        success = db.activate_dss_version(version_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to activate version")
+
+        # Reload the DSS file in the simulation
+        reload_success = digital_twin.reload_dss_file(version['content'])
+
+        return {
+            "success": True,
+            "version_id": version_id,
+            "version_number": version['version_number'],
+            "message": f"Activated version {version['version_number']}",
+            "reload_status": "success" if reload_success else "failed"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error activating DSS version {version_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================

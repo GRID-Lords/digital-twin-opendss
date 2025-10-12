@@ -109,7 +109,6 @@ class AnomalyRequest(BaseModel):
     type: str  # Anomaly type (voltage_sag, voltage_surge, transformer_overload, etc.)
     severity: Optional[float] = None  # Severity in p.u. or load factor
     location: Optional[str] = "Bus220_1"  # Bus or component
-    duration: Optional[float] = 5  # Duration in seconds or minutes or cycles
     parameters: Optional[Dict[str, Any]] = {}  # Additional parameters like transformer, harmonic_order, etc.
 
 class SimulationScenarioRequest(BaseModel):
@@ -127,7 +126,6 @@ class AnomalyResponse(BaseModel):
     location: str
     severity: float
     start_time: str
-    duration_ms: int
     impact: Dict[str, Any]
     visualization_data: Dict[str, Any]
 
@@ -227,7 +225,6 @@ async def trigger_anomaly(request: AnomalyRequest):
                     'anomaly_id': anomaly_id,
                     'anomaly_type': request.type,
                     'severity_value': severity_value,
-                    'duration': request.duration,
                     'parameters': request.parameters,
                     'insights': insights,
                     'system_state': system_state  # Add system state at time of anomaly
@@ -372,7 +369,6 @@ async def trigger_anomaly(request: AnomalyRequest):
             location=request.location,
             severity=severity_value,
             start_time=datetime.now().isoformat(),
-            duration_ms=int(request.duration * 1000) if request.duration else 0,  # Convert to milliseconds
             impact={**impact, 'insights': insights},  # Include insights in impact
             visualization_data=viz_data
         )
@@ -409,8 +405,7 @@ async def run_scenario(request: SimulationScenarioRequest):
             "success": True,
             "scenario": request.scenario,
             "timestamp": datetime.now().isoformat(),
-            "stages": processed_result,
-            "duration_ms": len(result.get('stages', [])) * 1000
+            "stages": processed_result
         }
 
     except Exception as e:

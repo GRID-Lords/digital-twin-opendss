@@ -76,6 +76,32 @@ start_docker() {
 
     echo -e "${GREEN}✓ Docker services started!${NC}"
     docker-compose ps
+
+    # Wait for services to be healthy
+    echo ""
+    echo -e "${YELLOW}Waiting for services to be ready...${NC}"
+    sleep 5
+
+    # Display success message
+    echo ""
+    echo "==========================================================="
+    echo -e "${GREEN} Digital Twin System Successfully Started!${NC}"
+    echo "==========================================================="
+    echo ""
+    echo "Access Points:"
+    echo "  • Frontend:    http://localhost:3000"
+    echo "  • Backend API: http://localhost:8000"
+    echo "  • API Docs:    http://localhost:8000/docs"
+    echo "  • InfluxDB:    http://localhost:8086"
+    echo "  • DSS Editor:  http://localhost:3000/dss-editor"
+    echo ""
+    echo "To stop all services: docker-compose down"
+    echo ""
+    echo -e "${BLUE}==================== Backend Logs ====================${NC}"
+    echo -e "${YELLOW}Showing live backend logs (Ctrl+C to exit, services will keep running)${NC}"
+    echo ""
+    sleep 2
+    docker-compose logs -f backend
 }
 
 # Function to start locally
@@ -182,6 +208,29 @@ start_local() {
     else
         echo -e "${YELLOW}Frontend not configured, running backend only${NC}"
     fi
+
+    # Display success message
+    echo ""
+    echo "==========================================================="
+    echo -e "${GREEN} Digital Twin System Successfully Started!${NC}"
+    echo "==========================================================="
+    echo ""
+    echo "Access Points:"
+    echo "  • Frontend:    http://localhost:3000"
+    echo "  • Backend API: http://localhost:8000"
+    echo "  • API Docs:    http://localhost:8000/docs"
+    echo "  • DSS Editor:  http://localhost:3000/dss-editor"
+    echo ""
+    echo "Backend PID: $BACKEND_PID"
+    [ ! -z "$FRONTEND_PID" ] && echo "Frontend PID: $FRONTEND_PID"
+    echo ""
+    echo "To stop: Press Ctrl+C or run: kill $BACKEND_PID"
+    echo ""
+    echo -e "${BLUE}==================== Backend Logs ====================${NC}"
+    echo -e "${YELLOW}Showing live backend logs (Ctrl+C to exit, services will keep running)${NC}"
+    echo ""
+    sleep 1
+    tail -f logs/backend.log
 }
 
 # Create logs directory if not exists
@@ -213,70 +262,15 @@ case "$MODE" in
         ;;
 esac
 
-# Display success message
-display_success() {
-    echo ""
-    echo "==========================================================="
-    echo -e "${GREEN} Digital Twin System Successfully Started!${NC}"
-    echo "==========================================================="
-    echo ""
-
-    if [ "$MODE" = "docker" ]; then
-        echo "Access Points:"
-        echo "  • Frontend:    http://localhost:3000"
-        echo "  • Backend API: http://localhost:8000"
-        echo "  • API Docs:    http://localhost:8000/docs"
-        echo "  • Grafana:     http://localhost:3001 (admin/admin)"
-        echo "  • InfluxDB:    http://localhost:8086"
-        echo ""
-        echo "To stop: docker-compose down"
-    else
-        echo "Access Points:"
-        echo "  • API Documentation: http://localhost:8000/docs"
-        echo "  • Backend API: http://localhost:8000"
-        echo "  • Health Check: http://localhost:8000/health"
-        echo "  • Cache Stats: http://localhost:8000/api/cache/stats"
-        [ ! -z "$FRONTEND_PID" ] && echo "  • Frontend Dashboard: http://localhost:3000"
-        echo ""
-        echo "Storage Strategy:"
-        echo "  • Real-time data: Cached for ${REALTIME_CACHE_TTL:-60} seconds"
-        echo "  • Metrics storage: Every ${METRICS_STORAGE_INTERVAL:-3600} seconds (hourly)"
-        echo "  • Database: ${DB_TYPE:-sqlite}"
-        echo ""
-        echo "Key Features:"
-        echo "  ✓ Complete asset modeling (Transformers, Breakers, CTs, CVTs)"
-        echo "  ✓ SCADA/IoT data integration (Modbus, IEC 61850)"
-        echo "  ✓ Advanced power flow simulation"
-        echo "  ✓ Fault analysis & contingency studies"
-        echo "  ✓ AI/ML anomaly detection & predictive maintenance"
-        echo "  ✓ Real-time monitoring with WebSockets"
-        echo "  ✓ Optimized data storage (hourly aggregation)"
-        echo ""
-        echo "API Endpoints:"
-        echo "  GET  /api/assets                  - Asset management"
-        echo "  GET  /api/metrics                 - Real-time metrics"
-        echo "  GET  /api/metrics/historical     - Historical data"
-        echo "  GET  /api/cache/stats            - Cache statistics"
-        echo "  GET  /api/scada/data             - SCADA data"
-        echo "  POST /api/simulation             - Run simulations"
-        echo "  GET  /api/ai/analysis            - AI/ML analysis"
-        echo "  WS   /ws                         - WebSocket"
-        echo ""
-        echo "To stop: Press Ctrl+C"
-    fi
-}
-
-# Display success message after starting
-display_success
-
-# Cleanup on exit (for local mode)
+# Cleanup on exit
 cleanup() {
     echo ""
     echo -e "${YELLOW}Shutting down Digital Twin...${NC}"
-    if [ "$MODE" = "docker" ]; then
+    if [ "$MODE" = "docker" ] || [ "$MODE" = "1" ]; then
+        echo -e "${BLUE}Stopping Docker containers...${NC}"
         docker-compose down
     else
-        kill $BACKEND_PID 2>/dev/null || true
+        [ ! -z "$BACKEND_PID" ] && kill $BACKEND_PID 2>/dev/null || true
         [ ! -z "$FRONTEND_PID" ] && kill $FRONTEND_PID 2>/dev/null || true
         deactivate 2>/dev/null || true
     fi
@@ -286,7 +280,5 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-# Keep running (for local mode)
-if [ "$MODE" != "docker" ]; then
-    wait $BACKEND_PID
-fi
+# Note: Logs are now being tailed in the start_docker() or start_local() functions
+# The script will continue running until user presses Ctrl+C

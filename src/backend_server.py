@@ -585,9 +585,11 @@ async def get_current_metrics():
     max_deviation = max(abs(max_voltage_pu - 1.0), abs(min_voltage_pu - 1.0))
     voltage_stability = 100 - (max_deviation * 100)  # Higher stability = lower deviation
 
-    # Realistic frequency with small variations (Indian grid: 50 Hz ± 0.03 Hz)
-    # Add small random variation to simulate grid dynamics
-    frequency = 50.0 + np.random.uniform(-0.03, 0.03)
+    # Get frequency from OpenDSS results (with fallback)
+    frequency = flow_results.get('frequency', 50.0) if flow_results else 50.0
+    # If OpenDSS didn't provide frequency or it's anomaly-affected, add small natural variation
+    if frequency == 50.0:
+        frequency = 50.0 + np.random.uniform(-0.03, 0.03)
 
     metrics = {
         "timestamp": timestamp.isoformat(),

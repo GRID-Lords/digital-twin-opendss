@@ -9,6 +9,7 @@ import {
   Monitor,
   FileText,
   TrendingUp,
+  FileCode,
   Menu,
   X
 } from 'lucide-react';
@@ -114,6 +115,7 @@ const Sidebar = ({ isOpen, onToggle }) => {
     { path: '/analytics', icon: BarChart3, label: 'Analytics' },
     { path: '/visualization', icon: Monitor, label: 'Visualization' },
     { path: '/trends', icon: TrendingUp, label: 'Trends' },
+    { path: '/dss-editor', icon: FileCode, label: 'DSS Editor' },
     { path: '/logging', icon: FileText, label: 'Logging' },
   ];
 

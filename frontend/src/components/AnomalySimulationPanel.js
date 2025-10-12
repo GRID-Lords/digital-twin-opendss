@@ -214,12 +214,12 @@ const AnomalySimulationPanel = () => {
   const [runningScenarios, setRunningScenarios] = useState({});
   const [statusMessage, setStatusMessage] = useState(null);
   const [scenarioParams, setScenarioParams] = useState({
-    voltage_sag: { severity: 0.85, duration: 3, location: 'Bus400_1' },
-    voltage_surge: { severity: 1.12, duration: 2, location: 'Bus220_1' },
-    overload: { load_factor: 1.2, transformer: 'TR1', duration: 15 },
-    ground_fault: { resistance: 5, location: 'Line400_1', duration: 3 },
+    voltage_sag: { severity: 0.85, location: 'Bus400_1' },
+    voltage_surge: { severity: 1.12, location: 'Bus220_1' },
+    overload: { load_factor: 1.2, transformer: 'TR1' },
+    ground_fault: { resistance: 5, location: 'Line400_1' },
     harmonics: { thd: 5, order: 5, source: 'CAP1' },
-    frequency_deviation: { deviation: 0.3, duration: 5, type: 'under' }
+    frequency_deviation: { deviation: 0.3, type: 'under' }
   });
 
   const scenarios = [
@@ -232,7 +232,6 @@ const AnomalySimulationPanel = () => {
       description: 'Simulates voltage drop below nominal levels, typically caused by large motor starts or faults.',
       parameters: [
         { key: 'severity', label: 'Severity (p.u.)', type: 'number', min: 0.5, max: 0.9, step: 0.1 },
-        { key: 'duration', label: 'Duration (s)', type: 'number', min: 1, max: 60, step: 1 },
         { key: 'location', label: 'Location', type: 'select', options: ['Bus220_1', 'Bus220_2', 'Bus400_1', 'Bus400_2'] }
       ]
     },
@@ -245,7 +244,6 @@ const AnomalySimulationPanel = () => {
       description: 'Simulates voltage rise above nominal levels due to capacitor switching or load rejection.',
       parameters: [
         { key: 'severity', label: 'Severity (p.u.)', type: 'number', min: 1.1, max: 1.3, step: 0.05 },
-        { key: 'duration', label: 'Duration (s)', type: 'number', min: 0.5, max: 30, step: 0.5 },
         { key: 'location', label: 'Location', type: 'select', options: ['Bus400_1', 'Bus400_2', 'Bus220_1', 'Bus220_2'] }
       ]
     },
@@ -258,8 +256,7 @@ const AnomalySimulationPanel = () => {
       description: 'Simulates excessive loading on transformers causing temperature rise and efficiency loss.',
       parameters: [
         { key: 'load_factor', label: 'Load Factor', type: 'number', min: 1.1, max: 2.0, step: 0.1 },
-        { key: 'transformer', label: 'Transformer', type: 'select', options: ['TR1', 'TR2', 'AUX_TR1', 'AUX_TR2'] },
-        { key: 'duration', label: 'Duration (min)', type: 'number', min: 1, max: 60, step: 5 }
+        { key: 'transformer', label: 'Transformer', type: 'select', options: ['TR1', 'TR2', 'AUX_TR1', 'AUX_TR2'] }
       ]
     },
     {
@@ -271,8 +268,7 @@ const AnomalySimulationPanel = () => {
       description: 'Simulates single line to ground fault with varying fault resistance.',
       parameters: [
         { key: 'resistance', label: 'Fault Resistance (Ω)', type: 'number', min: 0, max: 100, step: 10 },
-        { key: 'location', label: 'Location', type: 'select', options: ['Line220_1', 'Line220_2', 'Line400_1', 'Line400_2'] },
-        { key: 'duration', label: 'Duration (cycles)', type: 'number', min: 1, max: 10, step: 1 }
+        { key: 'location', label: 'Location', type: 'select', options: ['Line220_1', 'Line220_2', 'Line400_1', 'Line400_2'] }
       ]
     },
     {
@@ -297,8 +293,7 @@ const AnomalySimulationPanel = () => {
       description: 'Simulates system frequency deviation due to generation-load imbalance.',
       parameters: [
         { key: 'deviation', label: 'Deviation (Hz)', type: 'number', min: 0.1, max: 2.0, step: 0.1 },
-        { key: 'type', label: 'Type', type: 'select', options: ['under', 'over'] },
-        { key: 'duration', label: 'Duration (s)', type: 'number', min: 1, max: 30, step: 1 }
+        { key: 'type', label: 'Type', type: 'select', options: ['under', 'over'] }
       ]
     }
   ];
@@ -322,7 +317,6 @@ const AnomalySimulationPanel = () => {
         type: scenario.id,
         severity: params.severity,
         location: params.location,
-        duration: params.duration || 5,
         parameters: params
       });
 
