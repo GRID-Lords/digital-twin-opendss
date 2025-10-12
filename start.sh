@@ -16,8 +16,8 @@ NC='\033[0m'
 clear
 
 echo "==========================================================="
-echo "   Indian EHV 400/220 kV Substation Digital Twin"
-echo "   SIH India Hackathon - AI/ML Enabled System"
+echo "   GridTwin - Substation Digital Twin Platform"
+echo "   Real-time Monitoring & AI/ML Analytics"
 echo "==========================================================="
 echo ""
 

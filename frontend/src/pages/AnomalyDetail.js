@@ -32,12 +32,16 @@ const PageHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
 `;
 
 const Title = styled.h1`
-  color: #f1f5f9;
-  font-size: 2rem;
+  color: #1e293b;
+  font-size: 1.75rem;
   font-weight: 600;
+  letter-spacing: -0.025em;
 `;
 
 const SeverityBadge = styled.div`

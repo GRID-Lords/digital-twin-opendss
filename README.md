@@ -1,6 +1,6 @@
-# 🇮🇳 Indian EHV Substation Digital Twin
+# GridTwin - Substation Digital Twin Platform
 
-A comprehensive **full-stack Digital Twin solution** for Indian Extra High Voltage (EHV) 400/220 kV substations with real-time monitoring, AI/ML analytics, professional visualizations, modern web interface, SCADA integration, and complete API ecosystem.
+A comprehensive **full-stack Digital Twin solution** for Extra High Voltage (EHV) 400/220 kV substations with real-time monitoring, AI/ML analytics, professional visualizations, modern web interface, SCADA integration, and complete API ecosystem.
 
 ## 📋 Table of Contents
 - [Overview](#-overview)

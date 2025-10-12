@@ -745,7 +745,10 @@ const SubstationVisualization3D = () => {
 
   return (
     <Container>
-      <Canvas camera={{ position: [25, 20, 25], fov: 60 }}>
+      <Canvas
+        camera={{ position: [25, 20, 25], fov: 60 }}
+        gl={{ preserveDrawingBuffer: true }}
+      >
         <Scene assets={assets} metrics={metrics} />
       </Canvas>
     </Container>

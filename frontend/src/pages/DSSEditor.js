@@ -13,17 +13,17 @@ const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
 `;
 
 const Title = styled.h1`
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e293b;
   margin: 0;
+  letter-spacing: -0.025em;
 `;
 
 const ActionButtons = styled.div`

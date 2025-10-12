@@ -14,13 +14,16 @@ const PageHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
 `;
 
 const Title = styled.h1`
-  color: #2563eb;
+  color: #1e293b;
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.025em;
 `;
 
 const TimeRangeSelector = styled.div`

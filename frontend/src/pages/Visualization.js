@@ -16,21 +16,24 @@ const PageHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  border-radius: 12px;
+  margin-bottom: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
 `;
 
 const Title = styled.h1`
-  color: #2563eb;
+  color: #1e293b;
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 600;
   margin: 0;
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  letter-spacing: -0.025em;
 
   svg {
-    font-size: 2rem;
+    color: #3b82f6;
+    font-size: 1.5rem;
   }
 `;
 
@@ -40,9 +43,9 @@ const ControlButtons = styled.div`
 `;
 
 const ControlButton = styled.button`
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid #3b82f6;
   color: white;
-  background: #2563eb;
+  background: #3b82f6;
   padding: 0.625rem 1rem;
   border-radius: 8px;
   cursor: pointer;
@@ -52,11 +55,12 @@ const ControlButton = styled.button`
   gap: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
-  backdrop-filter: blur(10px);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: #2563eb;
+    border-color: #2563eb;
     transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
   }
 
   svg {
@@ -273,9 +277,100 @@ const Visualization = () => {
   };
 
   const handleExport = () => {
-    // Export current visualization as image
-    toast.success('Exporting visualization...');
-    // Implementation would capture canvas/svg and download
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `${viewMode === '2D' ? '2D' : '3D'}_Substation_Visualization_${timestamp}.png`;
+
+    toast.loading('Preparing export...', { id: 'export' });
+
+    // Get the visualization container
+    const container = visualizationRef.current;
+    if (!container) {
+      toast.error('Visualization not found', { id: 'export' });
+      return;
+    }
+
+    if (viewMode === '2D') {
+      // Export SVG as PNG for 2D view
+      const svg = container.querySelector('svg');
+      if (!svg) {
+        toast.error('SVG not found', { id: 'export' });
+        return;
+      }
+
+      try {
+        // Get SVG dimensions
+        const svgRect = svg.getBoundingClientRect();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size to match SVG
+        canvas.width = svgRect.width * 2; // 2x for better quality
+        canvas.height = svgRect.height * 2;
+        ctx.scale(2, 2);
+
+        // Serialize SVG to string
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+
+        // Load SVG as image
+        const img = new Image();
+        img.onload = () => {
+          // Fill white background
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Draw SVG onto canvas
+          ctx.drawImage(img, 0, 0, svgRect.width, svgRect.height);
+
+          // Convert canvas to PNG and download
+          canvas.toBlob((blob) => {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            URL.revokeObjectURL(link.href);
+            URL.revokeObjectURL(url);
+            toast.success('2D visualization exported!', { id: 'export' });
+          }, 'image/png');
+        };
+        img.onerror = () => {
+          toast.error('Failed to export visualization', { id: 'export' });
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      } catch (error) {
+        console.error('Export error:', error);
+        toast.error('Failed to export visualization', { id: 'export' });
+      }
+    } else {
+      // Export Canvas as PNG for 3D view
+      const canvas = container.querySelector('canvas');
+      if (!canvas) {
+        toast.error('Canvas not found', { id: 'export' });
+        return;
+      }
+
+      try {
+        // Convert canvas to blob and download
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            toast.error('Failed to capture 3D visualization', { id: 'export' });
+            return;
+          }
+
+          const link = document.createElement('a');
+          link.download = filename;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+          URL.revokeObjectURL(link.href);
+          toast.success('3D visualization exported!', { id: 'export' });
+        }, 'image/png');
+      } catch (error) {
+        console.error('Export error:', error);
+        toast.error('Failed to export visualization', { id: 'export' });
+      }
+    }
   };
 
   const handleRefresh = async () => {

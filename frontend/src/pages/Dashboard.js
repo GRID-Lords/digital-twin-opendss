@@ -18,17 +18,20 @@ const DashboardHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
 `;
 
 const Title = styled.h1`
-  color: #0f172a;
-  font-size: 1.5rem;
+  color: #1e293b;
+  font-size: 1.75rem;
   font-weight: 600;
+  letter-spacing: -0.025em;
 `;
 
 const LastUpdated = styled.div`
   color: #64748b;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 500;
 `;
 
@@ -67,34 +70,42 @@ const Dashboard = () => {
 
   // No need to fetch on mount - DigitalTwinContext already handles auto-refresh
 
+  // Get real trends from metrics data
+  const getTrend = (metricName) => {
+    if (metrics.trends && metrics.trends[metricName]) {
+      return metrics.trends[metricName].value;
+    }
+    return '±0.0%'; // Fallback if no trend data
+  };
+
   const metricCards = [
     {
       title: 'Total Power',
       value: `${metrics.total_power?.toFixed(2) || 0} MW`,
       icon: '',
       color: '#10b981',
-      trend: '+2.3%'
+      trend: getTrend('total_power')
     },
     {
       title: 'Efficiency',
       value: `${metrics.efficiency?.toFixed(2) || 0}%`,
       icon: '',
       color: '#3b82f6',
-      trend: '+0.5%'
+      trend: getTrend('efficiency')
     },
     {
       title: 'Voltage Stability',
       value: `${metrics.voltage_stability?.toFixed(2) || 0}%`,
       icon: '',
       color: '#8b5cf6',
-      trend: '+1.2%'
+      trend: getTrend('voltage_stability')
     },
     {
       title: 'Frequency',
       value: `${metrics.frequency?.toFixed(2) || 0} Hz`,
       icon: '',
       color: '#f59e0b',
-      trend: '±0.1%'
+      trend: getTrend('frequency')
     }
   ];
 

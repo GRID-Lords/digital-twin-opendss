@@ -1186,8 +1186,59 @@ async def get_assets_old():
 
 @app.get("/api/metrics")
 async def get_metrics():
-    """Get current system metrics"""
-    return await get_current_metrics()
+    """Get current system metrics with real trend calculations"""
+    # Get current metrics
+    metrics = await get_current_metrics()
+
+    # Calculate real trends from historical data
+    try:
+        from src.services.trend_calculator import get_trend_calculator
+
+        # Get historical data for trend calculation (last 24 hours)
+        historical_data = await data_manager.get_historical_metrics(hours=24)
+
+        if historical_data and len(historical_data) > 1:
+            trend_calc = get_trend_calculator(significance_threshold=0.1)
+
+            # Calculate trends for key metrics (1 hour comparison)
+            metric_names = ['total_power', 'efficiency', 'voltage_stability', 'frequency']
+            trends = {}
+
+            for metric_name in metric_names:
+                if metric_name in metrics:
+                    trend = trend_calc.calculate_trend(
+                        current_value=metrics[metric_name],
+                        historical_data=historical_data,
+                        metric_key=metric_name,
+                        period='1h'  # Compare with 1 hour ago
+                    )
+
+                    # Add trend information to metrics
+                    trends[metric_name] = {
+                        'value': trend_calc.format_trend_display(trend),
+                        'percentage': round(trend.percentage_change, 2),
+                        'direction': trend.trend_direction,
+                        'is_significant': trend.is_significant,
+                        'previous_value': trend.previous_value,
+                        'absolute_change': round(trend.absolute_change, 4)
+                    }
+
+            metrics['trends'] = trends
+        else:
+            # Not enough historical data - return neutral trends
+            metrics['trends'] = {
+                'total_power': {'value': '±0.0%', 'percentage': 0, 'direction': 'stable', 'is_significant': False},
+                'efficiency': {'value': '±0.0%', 'percentage': 0, 'direction': 'stable', 'is_significant': False},
+                'voltage_stability': {'value': '±0.0%', 'percentage': 0, 'direction': 'stable', 'is_significant': False},
+                'frequency': {'value': '±0.0%', 'percentage': 0, 'direction': 'stable', 'is_significant': False}
+            }
+
+    except Exception as e:
+        logger.error(f"Error calculating trends: {e}")
+        # Fallback to no trends if error occurs
+        metrics['trends'] = {}
+
+    return metrics
 
 @app.get("/api/scada/data")
 async def get_scada_data():

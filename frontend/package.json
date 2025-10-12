@@ -1,7 +1,7 @@
 {
-  "name": "substation-digital-twin-frontend",
+  "name": "gridtwin-frontend",
   "version": "1.0.0",
-  "description": "Frontend for Indian EHV Substation Digital Twin",
+  "description": "GridTwin - Substation Digital Twin Platform Frontend",
   "private": true,
   "dependencies": {
     "@react-three/drei": "^9.122.0",

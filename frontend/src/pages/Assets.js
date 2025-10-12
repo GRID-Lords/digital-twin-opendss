@@ -14,12 +14,16 @@ const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
 `;
 
 const Title = styled.h1`
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e293b;
+  letter-spacing: -0.025em;
 `;
 
 const Stats = styled.div`
