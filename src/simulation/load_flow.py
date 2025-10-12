@@ -13,6 +13,84 @@ class LoadFlowAnalysis:
         self.dss = None
         self.results = {}
         self.base_load_mw = 420  # Base load for Indian EHV substation
+        self.active_anomaly = None  # Store active anomaly to inject before solving
+
+    def set_anomaly(self, anomaly_type: str, parameters: Dict[str, Any]):
+        """Set active anomaly to be injected before next solve"""
+        self.active_anomaly = {
+            'type': anomaly_type,
+            'parameters': parameters
+        }
+        logger.info(f"Anomaly set: {anomaly_type} with params {parameters}")
+
+    def clear_anomaly(self):
+        """Clear active anomaly"""
+        self.active_anomaly = None
+        logger.info("Anomaly cleared")
+
+    def inject_anomaly_into_circuit(self):
+        """Inject active anomaly directly into OpenDSS circuit before solving"""
+        if not self.active_anomaly or not self.dss:
+            return
+
+        anomaly_type = self.active_anomaly['type']
+        params = self.active_anomaly['parameters']
+
+        try:
+            logger.info(f"🔥 Injecting anomaly into OpenDSS circuit: {anomaly_type}")
+
+            if anomaly_type == 'voltage_sag':
+                # Reduce source voltage
+                severity = params.get('severity', 0.85)
+                self.dss.Text.Command(f"Vsource.GridSource.pu={severity}")
+                logger.info(f"Applied voltage sag: voltage set to {severity} p.u.")
+
+            elif anomaly_type == 'voltage_surge':
+                # Increase source voltage
+                severity = params.get('severity', 1.12)
+                self.dss.Text.Command(f"Vsource.GridSource.pu={severity}")
+                logger.info(f"Applied voltage surge: voltage set to {severity} p.u.")
+
+            elif anomaly_type == 'overload' or anomaly_type == 'transformer_overload':
+                # Increase all loads by load factor
+                load_factor = params.get('load_factor', 1.2)
+                self.dss.Text.Command(f"set loadmult={load_factor}")
+                logger.info(f"Applied transformer overload: load multiplier set to {load_factor}")
+
+            elif anomaly_type == 'ground_fault':
+                # Enable a fault at specified location
+                location = params.get('location', 'Bus400kV_1')
+                resistance = params.get('resistance', 5)
+                # Create or modify fault object
+                self.dss.Text.Command(f"New Fault.AnomalyFault bus1={location} phases=1 r={resistance} enabled=yes")
+                logger.info(f"Applied ground fault at {location} with R={resistance}Ω")
+
+            elif anomaly_type == 'harmonics' or anomaly_type == 'harmonic_distortion':
+                # Add harmonic spectrum to loads
+                thd = params.get('thd', 5)
+                order = params.get('order', '5')
+                # Apply harmonic spectrum to loads
+                self.dss.Text.Command(f"Load.IndustrialLoad1.spectrum=defaultload")
+                self.dss.Text.Command(f"Load.IndustrialLoad2.spectrum=defaultload")
+                logger.info(f"Applied harmonic distortion: THD={thd}%, order={order}")
+
+            elif anomaly_type == 'frequency_deviation':
+                # Change base frequency
+                deviation = params.get('deviation', 0.3)
+                freq_type = params.get('type', 'under')
+                base_freq = 50.0
+                if freq_type == 'under':
+                    new_freq = base_freq - deviation
+                else:
+                    new_freq = base_freq + deviation
+                self.dss.Text.Command(f"set frequency={new_freq}")
+                logger.info(f"Applied frequency deviation: {new_freq} Hz")
+
+            else:
+                logger.warning(f"Unknown anomaly type: {anomaly_type}")
+
+        except Exception as e:
+            logger.error(f"Error injecting anomaly into circuit: {e}")
 
     def apply_realistic_load_pattern(self):
         """Apply realistic seasonal and daily load patterns to OpenDSS circuit"""
@@ -50,13 +128,18 @@ class LoadFlowAnalysis:
         else:  # Night valley
             daily_factor = 0.50 + hour * 0.02
 
-        # Combined load factor
+        # Combined load factor (but don't override if anomaly is active with overload)
         load_factor = seasonal_factor * daily_factor
+
+        # Skip load pattern if transformer overload anomaly is active (it sets its own loadmult)
+        if self.active_anomaly and self.active_anomaly['type'] in ['overload', 'transformer_overload']:
+            logger.debug("Skipping realistic load pattern - overload anomaly is active")
+            return
 
         try:
             # Apply load factor to all loads in circuit
             self.dss.Text.Command(f"set loadmult={load_factor}")
-            logger.info(f"Applied load pattern: seasonal={seasonal_factor:.2f}, daily={daily_factor:.2f}, total={load_factor:.2f}")
+            logger.debug(f"Applied load pattern: seasonal={seasonal_factor:.2f}, daily={daily_factor:.2f}, total={load_factor:.2f}")
         except Exception as e:
             logger.warning(f"Could not apply load pattern: {e}")
 
@@ -105,6 +188,9 @@ class LoadFlowAnalysis:
 
             # Apply realistic load patterns before solving
             self.apply_realistic_load_pattern()
+
+            # *** INJECT ANOMALY INTO CIRCUIT BEFORE SOLVING ***
+            self.inject_anomaly_into_circuit()
 
             # Solve the power flow
             self.dss.Text.Command("solve")

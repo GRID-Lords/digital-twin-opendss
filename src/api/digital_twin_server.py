@@ -27,6 +27,7 @@ import opendssdirect as dss
 from visualization.circuit_visualizer import OpenDSSVisualizer
 from models.ai_ml_models import SubstationAIManager
 from integration.scada_integration import SCADAIntegrationManager
+from simulation.load_flow import LoadFlowAnalysis
 import matplotlib
 matplotlib.use('Agg', force=True)
 
@@ -98,7 +99,7 @@ class IndianEHVSubstationDigitalTwin:
         self.is_running = False
         self.simulation_thread = None
         self.websocket_clients: List[WebSocketServerProtocol] = []
-        
+
         # Digital twin state
         self.assets: Dict[str, AssetStatus] = {}
         self.metrics = SubstationMetrics(
@@ -107,10 +108,14 @@ class IndianEHVSubstationDigitalTwin:
             grid_connection=True, fault_count=0
         )
         self.faults: List[FaultAnalysis] = []
-        
+
+        # OpenDSS Load Flow Analysis
+        self.load_flow = LoadFlowAnalysis()
+        self.opendss_results = {}
+
         # AI/ML integration
         self.ai_manager = SubstationAIManager()
-        
+
         # SCADA integration
         scada_config = {
             'collection_interval': 1.0,
@@ -118,7 +123,7 @@ class IndianEHVSubstationDigitalTwin:
             'modbus_port': 502
         }
         self.scada_manager = SCADAIntegrationManager(scada_config)
-        
+
         # Initialize the substation
         self._initialize_substation()
     
@@ -127,14 +132,22 @@ class IndianEHVSubstationDigitalTwin:
         try:
             logger.info("Initializing Indian EHV Substation Digital Twin...")
             self.visualizer.load_and_solve()
+
+            # Load OpenDSS circuit for real-time analysis
+            self.load_flow.load_circuit(str(self.dss_file))
+
+            # Run initial solve to get baseline data
+            self.opendss_results = self.load_flow.solve()
+            logger.info(f"Initial OpenDSS solve: {self.opendss_results}")
+
             self._setup_assets()
-            
+
             # Initialize AI/ML models
             self.ai_manager.initialize_with_synthetic_data()
-            
+
             # Start SCADA integration
             self.scada_manager.start_integration()
-            
+
             logger.info("Digital Twin initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize digital twin: {e}")
@@ -224,96 +237,232 @@ class IndianEHVSubstationDigitalTwin:
         """Main simulation loop for real-time updates"""
         while self.is_running:
             try:
-                # Update asset statuses
+                # Run OpenDSS solve to get real power flow data
+                self.opendss_results = self.load_flow.solve()
+                logger.debug(f"OpenDSS solve: converged={self.opendss_results.get('converged', False)}, total_power={self.opendss_results.get('total_power_kw', 0):.2f} kW")
+
+                # Update asset statuses with real OpenDSS data
                 self._update_asset_statuses()
-                
-                # Update substation metrics
+
+                # Update substation metrics with real OpenDSS data
                 self._update_substation_metrics()
-                
+
                 # Run AI/ML analysis
                 self._run_ai_analysis()
-                
+
                 # Broadcast updates to WebSocket clients
                 self._broadcast_updates()
-                
+
                 # Sleep for 1 second (1 Hz update rate)
                 time.sleep(1.0)
-                
+
             except Exception as e:
                 logger.error(f"Error in simulation loop: {e}")
                 time.sleep(1.0)
     
     def _update_asset_statuses(self):
-        """Update asset statuses based on simulation"""
+        """Update asset statuses with real OpenDSS data"""
         current_time = datetime.now().isoformat()
-        
-        for asset_id, asset in self.assets.items():
-            # Simulate realistic variations
-            if asset.asset_type == "PowerTransformer":
-                # Temperature variation based on load
-                base_temp = 45.0
-                load_factor = min(asset.power / 100000.0, 1.0)  # Normalize to 100MW
-                asset.temperature = base_temp + (load_factor * 20.0) + np.random.normal(0, 2)
-                
-                # Health score based on temperature and age
-                if asset.temperature > 80:
-                    asset.health_score = max(0, asset.health_score - 1)
-                    asset.status = "warning" if asset.health_score > 70 else "fault"
-                elif asset.temperature > 60:
-                    asset.status = "warning"
-                else:
-                    asset.status = "healthy"
-                
-                # Update voltage and current
-                asset.voltage = 400.0 + np.random.normal(0, 5)
-                asset.current = (asset.power / (asset.voltage * 1.732)) + np.random.normal(0, 10)
-            
-            elif asset.asset_type == "CircuitBreaker":
-                # Circuit breaker status
-                if asset.status == "fault":
-                    asset.health_score = max(0, asset.health_score - 2)
-                else:
-                    asset.health_score = min(100, asset.health_score + 0.1)
-            
-            elif asset.asset_type == "IndustrialLoad":
-                # Load variations
-                base_power = 15000.0 if "1" in asset_id else 12000.0
-                # Simulate daily load pattern
-                hour = datetime.now().hour
-                load_factor = 0.6 + 0.4 * np.sin(2 * np.pi * hour / 24)
-                asset.power = base_power * load_factor + np.random.normal(0, 500)
-                asset.voltage = 33.0 + np.random.normal(0, 1)
-                asset.current = asset.power / (asset.voltage * 1.732)
-            
-            asset.timestamp = current_time
+
+        # Get OpenDSS data
+        dss_engine = self.load_flow.dss
+        if not dss_engine:
+            logger.warning("OpenDSS not available, skipping asset update")
+            return
+
+        try:
+            # Update Grid Connection from OpenDSS source
+            if "Grid400kV" in self.assets:
+                asset = self.assets["Grid400kV"]
+                asset.voltage = self.opendss_results.get('voltage_400kv', 400.0)
+                asset.power = abs(self.opendss_results.get('total_power_kw', 0)) / 1000.0  # Convert to MW
+                asset.current = asset.power * 1000 / (asset.voltage * 1.732) if asset.voltage > 0 else 0
+                asset.temperature = 25.0
+                asset.status = "healthy" if self.opendss_results.get('converged', False) else "warning"
+                asset.timestamp = current_time
+
+            # Update Power Transformers (400/220 kV)
+            for transformer_id in ["TX1_400_220", "TX2_400_220"]:
+                if transformer_id in self.assets:
+                    asset = self.assets[transformer_id]
+
+                    # Get transformer data from OpenDSS
+                    try:
+                        dss_engine.Circuit.SetActiveElement(f"Transformer.{transformer_id}")
+                        powers = dss_engine.CktElement.Powers()  # Returns [kW, kvar] for each terminal
+                        if powers and len(powers) >= 2:
+                            # Power in kW (primary side)
+                            asset.power = abs(powers[0])  # kW
+                            # Voltage from OpenDSS results
+                            asset.voltage = self.opendss_results.get('voltage_400kv', 400.0)
+                            # Calculate current (3-phase)
+                            asset.current = asset.power / (asset.voltage * 1.732) if asset.voltage > 0 else 0
+                        else:
+                            asset.power = abs(self.opendss_results.get('total_power_kw', 0)) / 2000.0  # Estimate
+                            asset.voltage = self.opendss_results.get('voltage_400kv', 400.0)
+                            asset.current = asset.power / (asset.voltage * 1.732) if asset.voltage > 0 else 0
+                    except Exception as e:
+                        logger.debug(f"Could not get transformer data for {transformer_id}: {e}")
+                        asset.power = abs(self.opendss_results.get('total_power_kw', 0)) / 2000.0  # Estimate
+                        asset.voltage = self.opendss_results.get('voltage_400kv', 400.0)
+                        asset.current = asset.power / (asset.voltage * 1.732) if asset.voltage > 0 else 0
+
+                    # Temperature based on real load
+                    base_temp = 45.0
+                    load_mva = asset.power / 1000.0  # Convert kW to approx MVA
+                    load_factor = min(load_mva / 315.0, 1.0)  # 315 MVA rated
+                    asset.temperature = base_temp + (load_factor * 35.0) + np.random.normal(0, 1)
+
+                    # Health score based on temperature
+                    if asset.temperature > 85:
+                        asset.health_score = max(0, asset.health_score - 0.5)
+                        asset.status = "fault"
+                    elif asset.temperature > 70:
+                        asset.health_score = max(60, asset.health_score - 0.1)
+                        asset.status = "warning"
+                    else:
+                        asset.health_score = min(100, asset.health_score + 0.05)
+                        asset.status = "healthy"
+
+                    asset.timestamp = current_time
+
+            # Update Distribution Transformers (220/33 kV)
+            for transformer_id in ["DTX1_220_33", "DTX2_220_33"]:
+                if transformer_id in self.assets:
+                    asset = self.assets[transformer_id]
+
+                    # Get transformer data from OpenDSS
+                    try:
+                        dss_engine.Circuit.SetActiveElement(f"Transformer.{transformer_id}")
+                        powers = dss_engine.CktElement.Powers()
+                        if powers and len(powers) >= 2:
+                            asset.power = abs(powers[0])  # kW
+                            asset.voltage = self.opendss_results.get('voltage_220kv', 220.0)
+                            asset.current = asset.power / (asset.voltage * 1.732) if asset.voltage > 0 else 0
+                        else:
+                            asset.power = abs(self.opendss_results.get('total_power_kw', 0)) / 4000.0
+                            asset.voltage = self.opendss_results.get('voltage_220kv', 220.0)
+                            asset.current = asset.power / (asset.voltage * 1.732) if asset.voltage > 0 else 0
+                    except Exception as e:
+                        logger.debug(f"Could not get transformer data for {transformer_id}: {e}")
+                        asset.power = abs(self.opendss_results.get('total_power_kw', 0)) / 4000.0
+                        asset.voltage = self.opendss_results.get('voltage_220kv', 220.0)
+                        asset.current = asset.power / (asset.voltage * 1.732) if asset.voltage > 0 else 0
+
+                    # Temperature based on real load
+                    base_temp = 50.0
+                    load_mva = asset.power / 1000.0
+                    load_factor = min(load_mva / 50.0, 1.0)  # 50 MVA rated
+                    asset.temperature = base_temp + (load_factor * 30.0) + np.random.normal(0, 1)
+
+                    # Health score based on temperature
+                    if asset.temperature > 90:
+                        asset.health_score = max(0, asset.health_score - 0.5)
+                        asset.status = "fault"
+                    elif asset.temperature > 75:
+                        asset.health_score = max(60, asset.health_score - 0.1)
+                        asset.status = "warning"
+                    else:
+                        asset.health_score = min(100, asset.health_score + 0.05)
+                        asset.status = "healthy"
+
+                    asset.timestamp = current_time
+
+            # Update Circuit Breakers
+            for cb_id in [f"CB_{i}" for i in range(1, 6)]:
+                if cb_id in self.assets:
+                    asset = self.assets[cb_id]
+                    asset.temperature = 30.0 + np.random.normal(0, 2)
+                    if asset.status == "fault":
+                        asset.health_score = max(0, asset.health_score - 1)
+                    else:
+                        asset.health_score = min(100, asset.health_score + 0.05)
+                        asset.status = "healthy"
+                    asset.timestamp = current_time
+
+            # Update Industrial Loads with real OpenDSS data
+            for load_id in ["IndustrialLoad1", "IndustrialLoad2"]:
+                if load_id in self.assets:
+                    asset = self.assets[load_id]
+
+                    # Get load data from OpenDSS
+                    try:
+                        dss_engine.Circuit.SetActiveElement(f"Load.{load_id}")
+                        powers = dss_engine.CktElement.Powers()
+                        voltages = dss_engine.CktElement.VoltagesMagAng()
+
+                        if powers and len(powers) >= 2:
+                            asset.power = abs(powers[0])  # kW
+                            asset.current = abs(powers[0]) / (33.0 * 1.732) if powers[0] != 0 else 0
+                        else:
+                            # Fallback: use base values from DSS file
+                            base_power = 15000.0 if "1" in load_id else 12000.0
+                            asset.power = base_power
+                            asset.current = base_power / (33.0 * 1.732)
+
+                        # Get voltage from bus
+                        if voltages and len(voltages) >= 1:
+                            asset.voltage = voltages[0] / 1000.0  # Convert V to kV
+                        else:
+                            asset.voltage = 33.0
+                    except Exception as e:
+                        logger.debug(f"Could not get load data for {load_id}: {e}")
+                        # Fallback values
+                        base_power = 15000.0 if "1" in load_id else 12000.0
+                        asset.power = base_power
+                        asset.voltage = 33.0
+                        asset.current = base_power / (33.0 * 1.732)
+
+                    # Temperature based on real power
+                    base_temp = 35.0
+                    power_factor = asset.power / 20000.0  # Normalize
+                    asset.temperature = base_temp + (power_factor * 15.0) + np.random.normal(0, 1)
+
+                    # Health status
+                    if asset.power > 18000:
+                        asset.status = "warning"
+                        asset.health_score = max(70, asset.health_score - 0.1)
+                    else:
+                        asset.status = "healthy"
+                        asset.health_score = min(100, asset.health_score + 0.05)
+
+                    asset.timestamp = current_time
+
+        except Exception as e:
+            logger.error(f"Error updating asset statuses from OpenDSS: {e}")
+            # Continue with existing values
     
     def _update_substation_metrics(self):
-        """Update overall substation metrics"""
+        """Update overall substation metrics with real OpenDSS data"""
         current_time = datetime.now().isoformat()
-        
-        # Calculate total power
-        total_power = sum(asset.power for asset in self.assets.values() 
-                         if asset.asset_type in ["IndustrialLoad", "CommercialLoad"])
-        
-        # Calculate efficiency
-        input_power = sum(asset.power for asset in self.assets.values() 
-                         if asset.asset_type == "PowerTransformer")
-        self.metrics.efficiency = (total_power / input_power * 100) if input_power > 0 else 0
-        
-        # Voltage stability
-        voltages = [asset.voltage for asset in self.assets.values() if asset.voltage > 0]
-        if voltages:
-            voltage_std = np.std(voltages)
-            self.metrics.voltage_stability = max(0, 100 - (voltage_std / np.mean(voltages) * 100))
-        
-        # Update metrics
-        self.metrics.total_power = total_power
-        self.metrics.total_load = total_power
+
+        # Use real OpenDSS results
+        total_power_kw = abs(self.opendss_results.get('total_power_kw', 0))
+        total_power_kvar = abs(self.opendss_results.get('total_power_kvar', 0))
+        total_losses_mw = self.opendss_results.get('total_losses_mw', 0)
+
+        # Calculate total power in MW
+        total_power_mw = total_power_kw / 1000.0
+
+        # Calculate efficiency from real losses
+        input_power_mw = total_power_mw + total_losses_mw
+        self.metrics.efficiency = (total_power_mw / input_power_mw * 100) if input_power_mw > 0 else 0
+
+        # Voltage stability from OpenDSS voltage profile
+        max_voltage_pu = self.opendss_results.get('max_voltage_pu', 1.0)
+        min_voltage_pu = self.opendss_results.get('min_voltage_pu', 1.0)
+        voltage_deviation = (max_voltage_pu - min_voltage_pu) * 100
+        self.metrics.voltage_stability = max(0, 100 - voltage_deviation)
+
+        # Update metrics with real data
+        self.metrics.total_power = total_power_mw
+        self.metrics.total_load = total_power_mw
         self.metrics.timestamp = current_time
-        self.metrics.frequency = 50.0 + np.random.normal(0, 0.1)
-        self.metrics.grid_connection = all(asset.status != "fault" 
-                                         for asset in self.assets.values() 
-                                         if asset.asset_type == "GridConnection")
+        self.metrics.frequency = 50.0 + np.random.normal(0, 0.05)  # Grid frequency variation
+        self.metrics.grid_connection = (
+            self.opendss_results.get('converged', False) and
+            all(asset.status != "fault" for asset in self.assets.values() if asset.asset_type == "GridConnection")
+        )
     
     def _run_ai_analysis(self):
         """Run AI/ML analysis for predictive maintenance"""

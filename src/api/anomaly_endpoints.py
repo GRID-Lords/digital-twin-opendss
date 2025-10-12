@@ -347,6 +347,18 @@ async def trigger_anomaly(request: AnomalyRequest):
         }
         logger.info(f"🔥 Active anomaly SET: {active_anomaly}")
 
+        # *** INJECT ANOMALY INTO OPENDSS CIRCUIT ***
+        try:
+            import src.backend_server as backend
+            if hasattr(backend, 'load_flow') and backend.load_flow:
+                # Set anomaly in load_flow - it will be injected before next solve()
+                backend.load_flow.set_anomaly(request.type, request.parameters)
+                logger.info(f"✅ Anomaly injected into OpenDSS load_flow: {request.type}")
+            else:
+                logger.warning("load_flow not available - anomaly will only modify metrics, not OpenDSS circuit")
+        except Exception as inject_error:
+            logger.error(f"Failed to inject anomaly into OpenDSS circuit: {inject_error}")
+
         # NOTE: Auto-clear disabled - user must manually clear via /clear endpoint
         # asyncio.create_task(clear_anomaly_after_delay(
         #     anomaly_id,
@@ -443,6 +455,17 @@ async def clear_all_anomalies():
         # Clear the active anomaly tracking
         active_anomaly = None
         active_anomaly_task = None
+
+        # *** CLEAR ANOMALY FROM OPENDSS CIRCUIT ***
+        try:
+            import src.backend_server as backend
+            if hasattr(backend, 'load_flow') and backend.load_flow:
+                backend.load_flow.clear_anomaly()
+                logger.info("✅ Anomaly cleared from OpenDSS load_flow")
+            else:
+                logger.warning("load_flow not available")
+        except Exception as clear_error:
+            logger.error(f"Failed to clear anomaly from OpenDSS circuit: {clear_error}")
 
         return {
             "success": True,

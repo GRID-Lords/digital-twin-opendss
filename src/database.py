@@ -295,58 +295,109 @@ class DigitalTwinDatabase:
         """Store asset state snapshot."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO asset_states (
-                    asset_id, asset_type, status, health_score,
-                    voltage, current, power, temperature, data
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                asset_id,
-                asset_data.get('type', 'unknown'),
-                asset_data.get('status', 'unknown'),
-                asset_data.get('health_score', 100),
-                asset_data.get('voltage', 0),
-                asset_data.get('current', 0),
-                asset_data.get('power', 0),
-                asset_data.get('temperature', 0),
-                json.dumps(asset_data)
-            ))
-            return cursor.lastrowid
+            ph = self.placeholder
+
+            if self.use_postgres:
+                cursor.execute(f'''
+                    INSERT INTO asset_states (
+                        asset_id, asset_type, status, health_score,
+                        voltage, current, power, temperature, data
+                    ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    RETURNING id
+                ''', (
+                    asset_id,
+                    asset_data.get('type', 'unknown'),
+                    asset_data.get('status', 'unknown'),
+                    asset_data.get('health_score', 100),
+                    asset_data.get('voltage', 0),
+                    asset_data.get('current', 0),
+                    asset_data.get('power', 0),
+                    asset_data.get('temperature', 0),
+                    json.dumps(asset_data)
+                ))
+                result = cursor.fetchone()
+                return result[0] if result else None
+            else:
+                cursor.execute(f'''
+                    INSERT INTO asset_states (
+                        asset_id, asset_type, status, health_score,
+                        voltage, current, power, temperature, data
+                    ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                ''', (
+                    asset_id,
+                    asset_data.get('type', 'unknown'),
+                    asset_data.get('status', 'unknown'),
+                    asset_data.get('health_score', 100),
+                    asset_data.get('voltage', 0),
+                    asset_data.get('current', 0),
+                    asset_data.get('power', 0),
+                    asset_data.get('temperature', 0),
+                    json.dumps(asset_data)
+                ))
+                return cursor.lastrowid
 
     def store_alert(self, alert_type: str, severity: str, asset_id: str, message: str, data: Dict = None):
         """Store an alert/event."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO alerts (alert_type, severity, asset_id, message, data)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id
-            ''', (alert_type, severity, asset_id, message, json.dumps(data or {})))
-            result = cursor.fetchone()
-            if result:
-                # With RealDictCursor (PostgreSQL), result is a dict
-                # With sqlite3.Row (SQLite), result is row-like
-                return result.get('id') if hasattr(result, 'get') else result[0]
-            return None
+            ph = self.placeholder
+
+            if self.use_postgres:
+                cursor.execute(f'''
+                    INSERT INTO alerts (alert_type, severity, asset_id, message, data)
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
+                    RETURNING id
+                ''', (alert_type, severity, asset_id, message, json.dumps(data or {})))
+                result = cursor.fetchone()
+                if result:
+                    # With RealDictCursor (PostgreSQL), result is a dict
+                    return result.get('id') if hasattr(result, 'get') else result[0]
+                return None
+            else:
+                cursor.execute(f'''
+                    INSERT INTO alerts (alert_type, severity, asset_id, message, data)
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
+                ''', (alert_type, severity, asset_id, message, json.dumps(data or {})))
+                return cursor.lastrowid
 
     def store_ai_analysis(self, analysis_type: str, asset_id: str, results: Dict[str, Any]):
         """Store AI analysis results."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO ai_analysis (
-                    analysis_type, asset_id, anomaly_score,
-                    prediction, recommendation, data
-                ) VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                analysis_type,
-                asset_id,
-                results.get('anomaly_score', 0),
-                results.get('prediction', ''),
-                results.get('recommendation', ''),
-                json.dumps(results)
-            ))
-            return cursor.lastrowid
+            ph = self.placeholder
+
+            if self.use_postgres:
+                cursor.execute(f'''
+                    INSERT INTO ai_analysis (
+                        analysis_type, asset_id, anomaly_score,
+                        prediction, recommendation, data
+                    ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    RETURNING id
+                ''', (
+                    analysis_type,
+                    asset_id,
+                    results.get('anomaly_score', 0),
+                    results.get('prediction', ''),
+                    results.get('recommendation', ''),
+                    json.dumps(results)
+                ))
+                result = cursor.fetchone()
+                return result[0] if result else None
+            else:
+                cursor.execute(f'''
+                    INSERT INTO ai_analysis (
+                        analysis_type, asset_id, anomaly_score,
+                        prediction, recommendation, data
+                    ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                ''', (
+                    analysis_type,
+                    asset_id,
+                    results.get('anomaly_score', 0),
+                    results.get('prediction', ''),
+                    results.get('recommendation', ''),
+                    json.dumps(results)
+                ))
+                return cursor.lastrowid
 
     def get_metrics_history(self, hours: int = 24, limit: int = 1000) -> List[Dict]:
         """Get historical metrics."""
@@ -400,18 +451,20 @@ class DigitalTwinDatabase:
         """Mark an alert as acknowledged."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            ph = self.placeholder
+            cursor.execute(f'''
                 UPDATE alerts SET acknowledged = TRUE
-                WHERE id = ?
+                WHERE id = {ph}
             ''', (alert_id,))
 
     def resolve_alert(self, alert_id: int):
         """Mark an alert as resolved."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            ph = self.placeholder
+            cursor.execute(f'''
                 UPDATE alerts SET resolved = TRUE
-                WHERE id = ?
+                WHERE id = {ph}
             ''', (alert_id,))
 
     def get_aggregated_metrics(self, hours: int = 24, interval_minutes: int = 60) -> List[Dict]:
