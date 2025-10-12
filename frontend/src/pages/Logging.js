@@ -333,6 +333,27 @@ const MetaValue = styled.span`
   font-weight: 500;
 `;
 
+const ActionSection = styled.div`
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+`;
+
+const ActionTitle = styled.h3`
+  color: #1e293b;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+`;
+
+const ActionGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+`;
+
 const MarkdownContent = styled.div`
   color: #334155;
   font-size: 0.9375rem;
@@ -679,6 +700,52 @@ const Logging = () => {
     toast.success('Logs exported successfully');
   };
 
+  const handleAssigneeChange = async (alertId, assignee) => {
+    try {
+      await axios.post('/api/alerts/assign', {
+        alert_id: alertId,
+        assignee: assignee
+      });
+      toast.success(`Alert assigned to ${assignee}`);
+
+      // Update local state
+      setLogs(logs.map(log =>
+        log.id === alertId ? { ...log, assignee: assignee } : log
+      ));
+      if (selectedAlert && selectedAlert.id === alertId) {
+        setSelectedAlert({ ...selectedAlert, assignee: assignee });
+      }
+
+      fetchLogs(); // Refresh to get updated data
+    } catch (error) {
+      toast.error('Failed to assign alert');
+      console.error('Error assigning alert:', error);
+    }
+  };
+
+  const handleStatusChange = async (alertId, status) => {
+    try {
+      await axios.post('/api/alerts/status', {
+        alert_id: alertId,
+        status: status
+      });
+      toast.success(`Alert status updated to ${status}`);
+
+      // Update local state
+      setLogs(logs.map(log =>
+        log.id === alertId ? { ...log, status: status, resolved: status === 'resolved' } : log
+      ));
+      if (selectedAlert && selectedAlert.id === alertId) {
+        setSelectedAlert({ ...selectedAlert, status: status, resolved: status === 'resolved' });
+      }
+
+      fetchLogs(); // Refresh to get updated data
+    } catch (error) {
+      toast.error('Failed to update alert status');
+      console.error('Error updating alert status:', error);
+    }
+  };
+
   const getEventIcon = (type) => {
     switch (type) {
       case 'fault': return <AlertCircle />;
@@ -927,10 +994,20 @@ const Logging = () => {
                     })}
                   </MetaValue>
                 </MetaItem>
+                <MetaItem>
+                  <MetaLabel>Current Status</MetaLabel>
+                  <MetaValue style={{ textTransform: 'capitalize' }}>
+                    {selectedAlert.status || 'Pending'}
+                  </MetaValue>
+                </MetaItem>
+                <MetaItem>
+                  <MetaLabel>Assigned To</MetaLabel>
+                  <MetaValue>{selectedAlert.assignee || 'Unassigned'}</MetaValue>
+                </MetaItem>
                 {selectedAlert.acknowledged !== undefined && (
                   <MetaItem>
-                    <MetaLabel>Status</MetaLabel>
-                    <MetaValue>{selectedAlert.acknowledged ? '✓ Acknowledged' : 'Pending'}</MetaValue>
+                    <MetaLabel>Acknowledged</MetaLabel>
+                    <MetaValue>{selectedAlert.acknowledged ? '✓ Yes' : 'No'}</MetaValue>
                   </MetaItem>
                 )}
                 {selectedAlert.duration && (
@@ -940,6 +1017,40 @@ const Logging = () => {
                   </MetaItem>
                 )}
               </DialogMeta>
+
+              {/* Action Section for Assignee and Status */}
+              <ActionSection>
+                <ActionTitle>Alert Management</ActionTitle>
+                <ActionGrid>
+                  <FilterGroup>
+                    <Label>Assign To</Label>
+                    <Select
+                      value={selectedAlert.assignee || ''}
+                      onChange={(e) => handleAssigneeChange(selectedAlert.id, e.target.value)}
+                    >
+                      <option value="">Unassigned</option>
+                      <option value="Person 1">Person 1</option>
+                      <option value="Person 2">Person 2</option>
+                      <option value="Person 3">Person 3</option>
+                      <option value="Person 4">Person 4</option>
+                    </Select>
+                  </FilterGroup>
+
+                  <FilterGroup>
+                    <Label>Status</Label>
+                    <Select
+                      value={selectedAlert.status || 'pending'}
+                      onChange={(e) => handleStatusChange(selectedAlert.id, e.target.value)}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="investigating">Investigating</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </Select>
+                  </FilterGroup>
+                </ActionGrid>
+              </ActionSection>
 
               {/* System State at Time of Anomaly */}
               {selectedAlert.data && typeof selectedAlert.data === 'string' &&

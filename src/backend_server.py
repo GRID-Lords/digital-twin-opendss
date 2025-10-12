@@ -39,6 +39,8 @@ from src.api.asset_endpoints import router as asset_router
 from src.api.historical_endpoints import router as historical_router
 from src.api.alerts_endpoints import router as alerts_router
 from src.api.threshold_endpoints import router as threshold_router
+from src.api.dss_endpoints import router as dss_router
+from src.api.circuit_topology_endpoints import router as circuit_router
 from src.database import db  # Import database module
 from src.monitoring import alert_service, ai_insights_service
 
@@ -62,6 +64,8 @@ app.include_router(asset_router)
 app.include_router(historical_router)
 app.include_router(alerts_router)
 app.include_router(threshold_router)
+app.include_router(dss_router)
+app.include_router(circuit_router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -149,6 +153,33 @@ async def startup_event():
         if dss_path.exists():
             load_flow.load_circuit(str(dss_path))
             logger.info("OpenDSS circuit loaded")
+
+            # Set DSS endpoints dependencies
+            from src.api.dss_endpoints import set_dss_dependencies
+            set_dss_dependencies(None, load_flow, dss_path)
+            logger.info("DSS endpoints configured")
+
+            # Set circuit topology endpoints dependencies
+            from src.api.circuit_topology_endpoints import set_circuit_dependencies
+            set_circuit_dependencies(load_flow, dss_path)
+            logger.info("Circuit topology endpoints configured")
+
+            # Initialize DSS versioning - create first version if none exists
+            try:
+                active_version = db.get_active_dss_version()
+                if not active_version:
+                    logger.info("No DSS versions found, creating initial version...")
+                    original_content = dss_path.read_text()
+                    version_id = db.create_dss_version(
+                        content=original_content,
+                        created_by='system',
+                        description='Initial version from original DSS file'
+                    )
+                    logger.info(f"Created initial DSS version with ID {version_id}")
+                else:
+                    logger.info(f"Active DSS version found: v{active_version['version_number']}")
+            except Exception as e:
+                logger.error(f"Error initializing DSS versioning: {e}")
         else:
             logger.warning(f"DSS file not found at {dss_path}")
 

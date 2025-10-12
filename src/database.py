@@ -280,6 +280,24 @@ class DigitalTwinDatabase:
                     )
                 ''')
 
+            # Migrate existing alerts table to add new columns if they don't exist
+            try:
+                # Check if assignee column exists
+                cursor.execute("PRAGMA table_info(alerts)" if not self.use_postgres else
+                              "SELECT column_name FROM information_schema.columns WHERE table_name='alerts'")
+                columns = cursor.fetchall()
+                column_names = [col[1] if not self.use_postgres else col[0] for col in columns]
+
+                if 'assignee' not in column_names:
+                    logger.info("Adding assignee column to alerts table")
+                    cursor.execute('ALTER TABLE alerts ADD COLUMN assignee TEXT')
+
+                if 'status' not in column_names:
+                    logger.info("Adding status column to alerts table")
+                    cursor.execute("ALTER TABLE alerts ADD COLUMN status TEXT DEFAULT 'pending'")
+            except Exception as e:
+                logger.warning(f"Could not migrate alerts table (table may not exist yet): {e}")
+
             # Create indexes for better query performance
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp DESC)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_asset_states_timestamp ON asset_states(timestamp DESC, asset_id)')

@@ -72,7 +72,7 @@ start_docker() {
     docker-compose build
 
     echo -e "${BLUE}Starting Docker services...${NC}"
-    docker-compose up -d
+    docker-compose up -d backend frontend redis influxdb
 
     echo -e "${GREEN}✓ Docker services started!${NC}"
     docker-compose ps
@@ -112,20 +112,15 @@ start_local() {
     # Step 0: Start database containers
     echo -e "${BLUE}[0/6] Starting database containers...${NC}"
     if command_exists docker; then
-        # Start databases using docker compose
-        docker compose up -d postgres redis influxdb grafana 2>/dev/null || docker-compose up -d postgres redis influxdb grafana 2>/dev/null || true
+        # Start databases using docker compose (PostgreSQL optional, using SQLite by default)
+        docker compose up -d redis influxdb 2>/dev/null || docker-compose up -d redis influxdb 2>/dev/null || true
 
         # Wait for databases to be ready
         echo -e "${YELLOW}Waiting for databases to be ready...${NC}"
         sleep 5
 
-        # Check PostgreSQL
-        if docker ps | grep -q digitaltwin-postgres; then
-            echo -e "${GREEN}✓ PostgreSQL running${NC}"
-        fi
-
         # Check Redis
-        if docker ps | grep -q digitaltwin-redis; then
+        if docker ps | grep -q -E "digitaltwin-redis|chargeback-redis"; then
             echo -e "${GREEN}✓ Redis running${NC}"
         fi
 
@@ -133,6 +128,8 @@ start_local() {
         if docker ps | grep -q digitaltwin-influxdb; then
             echo -e "${GREEN}✓ InfluxDB running${NC}"
         fi
+
+        # Note: Using SQLite for persistent storage (faster startup)
     else
         echo -e "${YELLOW}Docker not found - using local SQLite databases${NC}"
     fi

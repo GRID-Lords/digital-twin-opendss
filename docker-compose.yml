@@ -1,26 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL - Main relational database
-  postgres:
-    image: postgres:15-alpine
-    container_name: digitaltwin-postgres
-    environment:
-      POSTGRES_DB: digitaltwin
-      POSTGRES_USER: digitaltwin
-      POSTGRES_PASSWORD: DT2024SecurePass
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U digitaltwin"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - digitaltwin-network
-
   # Redis - Real-time cache
   redis:
     image: redis:7-alpine
@@ -37,6 +17,7 @@ services:
       retries: 5
     networks:
       - digitaltwin-network
+    restart: unless-stopped
 
   # InfluxDB - Time-series metrics database
   influxdb:
@@ -61,6 +42,7 @@ services:
       retries: 5
     networks:
       - digitaltwin-network
+    restart: unless-stopped
 
   # Backend - FastAPI application
   backend:
@@ -73,21 +55,61 @@ services:
     volumes:
       - ./src:/app/src
       - ./logs:/app/logs
-    env_file:
-      - .env
+      - ./data:/app/data
+      - ./models:/app/models
     environment:
+      # Database Configuration (SQLite by default)
+      - DB_TYPE=sqlite
+      - DB_PATH=data/digital_twin.db
+
+      # Redis Cache
       - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # InfluxDB Time-series
       - INFLUX_HOST=influxdb
-      - POSTGRES_HOST=postgres
+      - INFLUX_PORT=8086
+      - INFLUX_USER=admin
+      - INFLUX_PASSWORD=DT2024SecurePass
+      - INFLUX_ORG=digitaltwin
+      - INFLUX_BUCKET=metrics
+      - INFLUX_TOKEN=dt-super-secret-auth-token-2024
+
+      # Application Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - LOG_LEVEL=INFO
+
+      # Data Storage Strategy
+      - REALTIME_CACHE_TTL=60
+      - METRICS_STORAGE_INTERVAL=3600
+      - ANALYSIS_BATCH_SIZE=100
+
+      # SCADA Configuration
+      - SCADA_ENABLED=true
+      - MODBUS_HOST=localhost
+      - MODBUS_PORT=502
+      - SCADA_POLLING_INTERVAL=5
+
+      # AI/ML Configuration
+      - ML_ENABLED=true
+      - ANOMALY_THRESHOLD=0.95
+      - PREDICTION_HORIZON=24
+      - MODEL_UPDATE_INTERVAL=86400
+
+      # Feature Flags
+      - ENABLE_3D_VISUALIZATION=true
+      - ENABLE_ANOMALY_DETECTION=true
+      - ENABLE_PREDICTIVE_MAINTENANCE=true
+      - ENABLE_OPTIMIZATION=true
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       influxdb:
         condition: service_healthy
     networks:
       - digitaltwin-network
+    restart: unless-stopped
 
   # Frontend - React application
   frontend:
@@ -97,19 +119,20 @@ services:
     container_name: digitaltwin-frontend
     ports:
       - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_WS_URL=ws://localhost:8000/ws
     depends_on:
       - backend
     networks:
       - digitaltwin-network
-
+    restart: unless-stopped
 
 networks:
   digitaltwin-network:
     driver: bridge
 
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
   influxdb_data:
