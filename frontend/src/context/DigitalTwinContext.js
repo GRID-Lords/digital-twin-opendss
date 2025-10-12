@@ -32,7 +32,7 @@ export const DigitalTwinProvider = ({ children }) => {
   useEffect(() => {
     const connectWebSocket = () => {
       try {
-        const websocket = new WebSocket('ws://localhost:8000/ws');
+        const websocket = new WebSocket(process.env.REACT_APP_WS_URL || 'wss://gridlords.dev/api/ws');
         
         websocket.onopen = () => {
           console.log('WebSocket connected');

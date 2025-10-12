@@ -253,6 +253,36 @@ const AlertsTable = ({ sourceFilter = null }) => {
           };
         });
 
+        // Add dummy alerts if no real alerts exist
+        if (formattedAlerts.length === 0) {
+          formattedAlerts.push(
+            {
+              id: 'dummy-1',
+              message: 'Transformer TR1 temperature elevated to 87°C',
+              fullMessage: 'Transformer TR1 operating temperature has increased to 87°C, exceeding normal operating range of 75°C. Cooling system efficiency should be verified.',
+              time: '25 minutes ago',
+              timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+              severity: 'medium',
+              type: 'Temperature',
+              source: 'temperature',
+              icon: FiAlertTriangle,
+              data: { temperature: 87, threshold: 85 }
+            },
+            {
+              id: 'dummy-2',
+              message: 'Circuit Breaker CB_400_3 high operation count detected',
+              fullMessage: 'Circuit Breaker CB_400_3 has reached 9,850 operations, approaching the maintenance threshold of 10,000 operations. Schedule maintenance inspection soon.',
+              time: '2 hours ago',
+              timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+              severity: 'low',
+              type: 'Maintenance',
+              source: 'maintenance',
+              icon: FiInfo,
+              data: { operations: 9850, threshold: 10000 }
+            }
+          );
+        }
+
         setAlerts(formattedAlerts);
       }
     } catch (error) {

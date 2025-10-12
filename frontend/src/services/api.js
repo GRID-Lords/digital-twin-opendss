@@ -5,7 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 
 // Configure axios defaults
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'https://gridlords.dev/api';
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 // Request interceptor for auth
@@ -230,7 +230,7 @@ export class WebSocketService {
   }
 
   connect() {
-    const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+    const wsUrl = process.env.REACT_APP_WS_URL || 'wss://gridlords.dev/api/ws';
 
     this.ws = new WebSocket(wsUrl);
 
@@ -312,7 +312,7 @@ export class AnomalyWebSocket {
   }
 
   connect() {
-    const wsUrl = 'ws://localhost:8000/api/simulation/ws/anomaly';
+    const wsUrl = 'wss://gridlords.dev/api/api/simulation/ws/anomaly';
 
     this.ws = new WebSocket(wsUrl);
 
