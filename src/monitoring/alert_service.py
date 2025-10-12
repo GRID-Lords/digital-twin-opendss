@@ -239,5 +239,23 @@ class AlertService:
         except Exception as e:
             logger.error(f"Failed to resolve alert: {e}")
 
+    def update_alert_assignee(self, alert_id: int, assignee: str):
+        """Update the assignee for an alert"""
+        try:
+            db.update_alert_assignee(alert_id, assignee)
+            logger.info(f"Alert {alert_id} assigned to {assignee}")
+        except Exception as e:
+            logger.error(f"Failed to update alert assignee: {e}")
+            raise
+
+    def update_alert_status(self, alert_id: int, status: str):
+        """Update the status of an alert"""
+        try:
+            db.update_alert_status(alert_id, status)
+            logger.info(f"Alert {alert_id} status updated to {status}")
+        except Exception as e:
+            logger.error(f"Failed to update alert status: {e}")
+            raise
+
 # Global instance
 alert_service = AlertService()

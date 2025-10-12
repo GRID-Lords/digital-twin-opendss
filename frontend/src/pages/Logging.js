@@ -358,6 +358,7 @@ const MarkdownContent = styled.div`
   color: #334155;
   font-size: 0.9375rem;
   line-height: 1.7;
+  margin-top: 2rem;
 
   h1, h2, h3, h4, h5, h6 {
     color: #1e293b;

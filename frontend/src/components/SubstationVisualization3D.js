@@ -17,32 +17,6 @@ const Container = styled.div`
 `;
 
 
-const InfoPanel = styled.div`
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: transparent;
-  color: #f1f5f9;
-  border: none;
-  border-radius: 8px;
-  padding: 15px;
-  max-width: 300px;
-  font-size: 12px;
-  z-index: 100;
-
-  h4 {
-    margin: 0 0 10px 0;
-    color: #f1f5f9;
-    font-weight: bold;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
-  }
-
-  div {
-    margin: 5px 0;
-    color: #f1f5f9;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
-  }
-`;
 
 // Enhanced 3D Components
 
@@ -771,15 +745,6 @@ const SubstationVisualization3D = () => {
 
   return (
     <Container>
-      <InfoPanel>
-        <h4>EHV Substation Status</h4>
-        <div>Total Power: {metrics.total_power?.toFixed(1) || 0} MW</div>
-        <div>Frequency: {metrics.frequency?.toFixed(2) || 50.00} Hz</div>
-        <div>Voltage Stability: {metrics.voltage_stability?.toFixed(1) || 0}%</div>
-        <div>System Efficiency: {metrics.efficiency?.toFixed(1) || 0}%</div>
-        <div>Active Components: {assets.total_assets || 0}</div>
-      </InfoPanel>
-
       <Canvas camera={{ position: [25, 20, 25], fov: 60 }}>
         <Scene assets={assets} metrics={metrics} />
       </Canvas>

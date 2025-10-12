@@ -25,7 +25,7 @@ class TestSystemStartup:
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
         try:
-            from api.digital_twin_server import app, digital_twin
+            from backend_server import app, digital_twin
             assert app is not None
             assert digital_twin is not None
         except ImportError as e:
@@ -127,7 +127,7 @@ class TestDataFlow:
         # For now, we'll test the WebSocket endpoint exists
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
-        from api.digital_twin_server import app
+        from backend_server import app
         
         # Check that WebSocket endpoint is defined
         routes = [route.path for route in app.routes]
@@ -223,7 +223,7 @@ class TestSystemComponents:
         """Test complete asset control workflow"""
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
-        from api.digital_twin_server import IndianEHVSubstationDigitalTwin
+        from backend_server import IndianEHVSubstationDigitalTwin
         
         # Create digital twin instance
         digital_twin = IndianEHVSubstationDigitalTwin()
@@ -246,7 +246,7 @@ class TestSystemPerformance:
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
         from fastapi.testclient import TestClient
-        from api.digital_twin_server import app
+        from backend_server import app
         
         client = TestClient(app)
         
@@ -302,7 +302,7 @@ class TestSystemPerformance:
         
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
-        from api.digital_twin_server import IndianEHVSubstationDigitalTwin
+        from backend_server import IndianEHVSubstationDigitalTwin
         
         digital_twin = IndianEHVSubstationDigitalTwin()
         results = queue.Queue()
@@ -345,7 +345,7 @@ class TestSystemReliability:
         """Test system error recovery"""
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
-        from api.digital_twin_server import IndianEHVSubstationDigitalTwin
+        from backend_server import IndianEHVSubstationDigitalTwin
         
         digital_twin = IndianEHVSubstationDigitalTwin()
         
@@ -394,7 +394,7 @@ class TestSystemReliability:
         
         # Test that all components can be imported
         try:
-            from api.digital_twin_server import app, digital_twin
+            from backend_server import app, digital_twin
             from models.ai_ml_models import SubstationAIManager
             from integration.scada_integration import SCADAIntegrationManager
             from visualization.circuit_visualizer import OpenDSSVisualizer

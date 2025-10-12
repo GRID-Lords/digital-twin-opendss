@@ -9,11 +9,12 @@ import time
 from fastapi.testclient import TestClient
 import sys
 from pathlib import Path
+from unittest.mock import Mock, patch, MagicMock
 
 # Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from api.digital_twin_server import app
+from backend_server import app
 
 @pytest.fixture
 def client():
@@ -23,7 +24,7 @@ def client():
 @pytest.fixture
 def mock_digital_twin():
     """Mock digital twin for testing"""
-    with pytest.Mock() as mock:
+    with Mock() as mock:
         mock.get_all_assets.return_value = {
             'TX1_400_220': {
                 'asset_id': 'TX1_400_220',
@@ -83,7 +84,7 @@ class TestAssetEndpoints:
     
     def test_get_all_assets(self, client, mock_digital_twin):
         """Test getting all assets"""
-        with pytest.Mock.patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
+        with patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
             response = client.get("/api/assets")
             assert response.status_code == 200
             
@@ -93,7 +94,7 @@ class TestAssetEndpoints:
     
     def test_get_specific_asset(self, client, mock_digital_twin):
         """Test getting a specific asset"""
-        with pytest.Mock.patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
+        with patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
             response = client.get("/api/assets/TX1_400_220")
             assert response.status_code == 200
             
@@ -103,13 +104,13 @@ class TestAssetEndpoints:
     
     def test_get_nonexistent_asset(self, client, mock_digital_twin):
         """Test getting a non-existent asset"""
-        with pytest.Mock.patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
+        with patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
             response = client.get("/api/assets/NONEXISTENT")
             assert response.status_code == 404
     
     def test_control_asset(self, client, mock_digital_twin):
         """Test controlling an asset"""
-        with pytest.Mock.patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
+        with patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
             control_data = {
                 "asset_id": "TX1_400_220",
                 "action": "open",
@@ -124,7 +125,7 @@ class TestAssetEndpoints:
     
     def test_control_asset_invalid(self, client, mock_digital_twin):
         """Test controlling an asset with invalid data"""
-        with pytest.Mock.patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
+        with patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
             control_data = {
                 "asset_id": "NONEXISTENT",
                 "action": "invalid_action",
@@ -139,7 +140,7 @@ class TestMetricsEndpoints:
     
     def test_get_metrics(self, client, mock_digital_twin):
         """Test getting substation metrics"""
-        with pytest.Mock.patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
+        with patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
             response = client.get("/api/metrics")
             assert response.status_code == 200
             
@@ -240,7 +241,7 @@ class TestFaultAnalysisEndpoints:
     
     def test_analyze_fault(self, client, mock_digital_twin):
         """Test fault analysis"""
-        with pytest.Mock.patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
+        with patch('src.api.digital_twin_server.digital_twin', mock_digital_twin):
             response = client.post("/api/faults/analyze?fault_type=line_to_ground&fault_location=Bus400kV_1")
             assert response.status_code == 200
             
