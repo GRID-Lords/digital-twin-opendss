@@ -66,18 +66,21 @@ const AnomalyItem = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 0.875rem 1rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-left: 3px solid ${props => props.severity === 'high' ? '#dc2626' : '#f59e0b'};
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-left: 3px solid ${props => props.severity === 'high' ? '#ef4444' : '#f59e0b'};
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateX(4px);
+    background: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
   }
 `;
 
@@ -90,24 +93,24 @@ const AnomalyInfo = styled.div`
 const AnomalyAsset = styled.div`
   font-size: 0.875rem;
   font-weight: 500;
-  color: #334155;
+  color: #111827;
 `;
 
 const AnomalyScore = styled.div`
   font-size: 0.75rem;
-  color: #64748b;
+  color: #6b7280;
 `;
 
 const AnomalySeverity = styled.div`
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   padding: 0.25rem 0.625rem;
-  border-radius: 4px;
+  border-radius: 3px;
   background: ${props => props.severity === 'high' ? '#fef2f2' : '#fffbeb'};
-  color: ${props => props.severity === 'high' ? '#dc2626' : '#f59e0b'};
-  border: 1px solid ${props => props.severity === 'high' ? '#fca5a5' : '#fde68a'};
+  color: ${props => props.severity === 'high' ? '#dc2626' : '#d97706'};
+  border: 1px solid ${props => props.severity === 'high' ? '#fecaca' : '#fcd34d'};
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.05em;
 `;
 
 const PredictionItem = styled.div`
@@ -115,15 +118,20 @@ const PredictionItem = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 0.875rem 1rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-left: 3px solid #3b82f6;
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
   transition: all 0.2s ease;
 
   &:hover {
-    background: #eff6ff;
+    background: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
   }
 `;
 
@@ -136,45 +144,45 @@ const PredictionInfo = styled.div`
 const PredictionAsset = styled.div`
   font-size: 0.875rem;
   font-weight: 500;
-  color: #334155;
+  color: #111827;
 `;
 
 const PredictionHealth = styled.div`
   font-size: 0.75rem;
-  color: #64748b;
+  color: #6b7280;
 `;
 
 const PredictionUrgency = styled.div`
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   padding: 0.25rem 0.625rem;
-  border-radius: 4px;
+  border-radius: 3px;
   background: ${props => {
     switch (props.urgency) {
       case 'critical': return '#fef2f2';
       case 'high': return '#fffbeb';
       case 'medium': return '#eff6ff';
-      default: return '#f8fafc';
+      default: return '#f9fafb';
     }
   }};
   color: ${props => {
     switch (props.urgency) {
       case 'critical': return '#dc2626';
-      case 'high': return '#f59e0b';
-      case 'medium': return '#3b82f6';
-      default: return '#64748b';
+      case 'high': return '#d97706';
+      case 'medium': return '#2563eb';
+      default: return '#6b7280';
     }
   }};
   border: 1px solid ${props => {
     switch (props.urgency) {
-      case 'critical': return '#fca5a5';
-      case 'high': return '#fde68a';
+      case 'critical': return '#fecaca';
+      case 'high': return '#fcd34d';
       case 'medium': return '#93c5fd';
-      default: return '#e2e8f0';
+      default: return '#e5e7eb';
     }
   }};
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.05em;
 `;
 
 const OptimizationItem = styled.div`
@@ -182,15 +190,20 @@ const OptimizationItem = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 0.875rem 1rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-left: 3px solid #16a34a;
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #10b981;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
   transition: all 0.2s ease;
 
   &:hover {
-    background: #f0fdf4;
+    background: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
   }
 `;
 
@@ -203,51 +216,51 @@ const OptimizationInfo = styled.div`
 const OptimizationAction = styled.div`
   font-size: 0.875rem;
   font-weight: 500;
-  color: #334155;
+  color: #111827;
 `;
 
 const OptimizationDescription = styled.div`
   font-size: 0.75rem;
-  color: #64748b;
+  color: #6b7280;
 `;
 
 const OptimizationPriority = styled.div`
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   padding: 0.25rem 0.625rem;
-  border-radius: 4px;
+  border-radius: 3px;
   background: ${props => {
     switch (props.priority) {
       case 'high': return '#fef2f2';
       case 'medium': return '#fffbeb';
       case 'low': return '#eff6ff';
-      default: return '#f8fafc';
+      default: return '#f9fafb';
     }
   }};
   color: ${props => {
     switch (props.priority) {
       case 'high': return '#dc2626';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#3b82f6';
-      default: return '#64748b';
+      case 'medium': return '#d97706';
+      case 'low': return '#2563eb';
+      default: return '#6b7280';
     }
   }};
   border: 1px solid ${props => {
     switch (props.priority) {
-      case 'high': return '#fca5a5';
-      case 'medium': return '#fde68a';
+      case 'high': return '#fecaca';
+      case 'medium': return '#fcd34d';
       case 'low': return '#93c5fd';
-      default: return '#e2e8f0';
+      default: return '#e5e7eb';
     }
   }};
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.05em;
 `;
 
 const EmptyState = styled.div`
   text-align: center;
   padding: 2rem;
-  color: #64748b;
+  color: #9ca3af;
   font-size: 0.875rem;
 `;
 
@@ -270,12 +283,13 @@ const FALLBACK_OPTIMIZATION = {
   optimization_score: 87.3
 };
 const InsightsSection = styled.div`
-  background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
-  border: 1px solid #4f46e5;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 2rem;
   margin-bottom: 2rem;
-  color: #f1f5f9;
+  color: #1e293b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 `;
 
 const InsightsSummary = styled.div`
@@ -283,6 +297,7 @@ const InsightsSummary = styled.div`
   font-weight: 600;
   margin-bottom: 1.5rem;
   line-height: 1.6;
+  color: #1e293b;
 `;
 
 const InsightsGrid = styled.div`
@@ -297,7 +312,8 @@ const InsightsGrid = styled.div`
 `;
 
 const InsightCard = styled.div`
-  background: rgba(255, 255, 255, 0.1);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 1rem;
 `;
@@ -308,7 +324,7 @@ const InsightTitle = styled.h4`
   margin-bottom: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #e0e7ff;
+  color: #475569;
 `;
 
 const InsightList = styled.ul`
@@ -323,12 +339,13 @@ const InsightItem = styled.li`
   padding-left: 1.25rem;
   position: relative;
   line-height: 1.5;
+  color: #334155;
 
   &:before {
     content: "•";
     position: absolute;
     left: 0;
-    color: #60a5fa;
+    color: #3b82f6;
     font-weight: bold;
   }
 `;
@@ -336,10 +353,13 @@ const InsightItem = styled.li`
 const StatusBadge = styled.div`
   display: inline-block;
   padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.15);
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 6px;
   font-size: 0.85rem;
   margin-top: 1rem;
+  color: #1e40af;
+  font-weight: 500;
 `;
 
 const Analytics = () => {
@@ -421,14 +441,15 @@ const Analytics = () => {
             <div style={{
               marginTop: '1.5rem',
               padding: '1rem',
-              background: 'rgba(59, 130, 246, 0.15)',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
               borderRadius: '8px',
               borderLeft: '4px solid #3b82f6'
             }}>
-              <div style={{ fontSize: '0.85rem', color: '#60a5fa', marginBottom: '0.5rem', fontWeight: 600 }}>
+              <div style={{ fontSize: '0.85rem', color: '#3b82f6', marginBottom: '0.5rem', fontWeight: 600 }}>
                 🔌 CIRCUIT TOPOLOGY ANALYSIS
               </div>
-              <div style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>
+              <div style={{ fontSize: '0.9rem', lineHeight: 1.6, color: '#334155' }}>
                 {llmInsights.circuit_analysis}
               </div>
             </div>
